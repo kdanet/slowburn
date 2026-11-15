@@ -1,4 +1,5 @@
 import AppKit
+import BudgetCore
 import QuotaKit
 import SwiftUI
 
@@ -85,6 +86,24 @@ enum IconExport {
         p.arguments = ["-c", "icns", iconset.path, "-o", base.appendingPathComponent("AppIcon.icns").path]
         try? p.run()
         p.waitUntilExit()
+        exit(0)
+    }
+
+    /// `Slowburn --export-activities dir name,name…`: one transparent PNG per activity, for the landing page.
+    /// Claude and Codex take turns, each caught at a moment where its props are mid-action.
+    @MainActor
+    static func activities(to dir: String, names: [String]) {
+        let base = URL(fileURLWithPath: dir, isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        for (i, name) in names.enumerated() {
+            guard let a = Activity(rawValue: name) else { continue }
+            let provider: Provider = i % 2 == 0 ? .claude : .codex
+            let view = BlobView(provider: provider, mood: .calm, level: 1, size: 120, animate: false,
+                                activity: a, stillTime: 1.1 + Double(i) * 0.37)
+                .frame(width: 240, height: 220)
+                .environment(\.colorScheme, .dark)
+            write(view, scale: 2, to: base.appendingPathComponent("\(name).png"))
+        }
         exit(0)
     }
 

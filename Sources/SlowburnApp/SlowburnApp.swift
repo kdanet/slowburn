@@ -213,25 +213,29 @@ struct PopoverView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
-            Menu {
-                Picker("Отпускать агентов", selection: $holds.settings.releaseMode) {
-                    ForEach(ReleaseMode.allCases, id: \.self) { Text($0.title).tag($0) }
+            if anchored {
+                Menu {
+                    Picker("Отпускать агентов", selection: $holds.settings.releaseMode) {
+                        ForEach(ReleaseMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    Divider()
+                    Button("Обновить сейчас") { Task { await model.refresh() } }
+                        .keyboardShortcut("r")
+                    Button("Перепланировать от текущего остатка") { model.replan() }
+                    Divider()
+                    Button("Выйти из Slowburn") { NSApp.terminate(nil) }
+                        .keyboardShortcut("q")
+                } label: {
+                    Image(systemName: "gearshape")
                 }
-                Divider()
-                Button("Обновить сейчас") { Task { await model.refresh() } }
-                    .keyboardShortcut("r")
-                Button("Перепланировать от текущего остатка") { model.replan() }
-                Divider()
-                Button("Выйти из Slowburn") { NSApp.terminate(nil) }
-                    .keyboardShortcut("q")
-            } label: {
-                Image(systemName: "gearshape")
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .focusEffectDisabled()
+                .accessibilityLabel("Настройки")
+            } else {
+                Image(systemName: "gearshape").foregroundStyle(.secondary)
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .focusEffectDisabled()
-            .accessibilityLabel("Настройки")
         }
     }
 
@@ -280,10 +284,15 @@ struct PopoverView: View {
                         .foregroundStyle(.tertiary)
                 }
                 Spacer()
-                Toggle("Мягкий тормоз", isOn: Binding(get: { model.brakeOn }, set: { model.setBrake($0) }))
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                    .labelsHidden()
+                if anchored {
+                    Toggle("Мягкий тормоз", isOn: Binding(get: { model.brakeOn }, set: { model.setBrake($0) }))
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        .labelsHidden()
+                } else {
+                    // Snapshots can't draw AppKit controls: a drawn switch stands in.
+                    BigSwitch(on: model.brakeOn).scaleEffect(0.6).frame(width: 32, height: 18)
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
@@ -301,6 +310,9 @@ struct SlowburnApp: App {
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
             Self.snapshot(to: args[i + 1])
+        }
+        if let i = args.firstIndex(of: "--export-activities"), i + 2 < args.count {
+            IconExport.activities(to: args[i + 1], names: args[i + 2].split(separator: ",").map(String.init))
         }
         if let i = args.firstIndex(of: "--export-icons"), i + 1 < args.count {
             IconExport.run(to: args[i + 1])
