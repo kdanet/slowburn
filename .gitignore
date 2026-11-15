@@ -1,0 +1,5 @@
+.build/
+.swiftpm/
+probes/logs/
+probes/backups/
+.DS_Store

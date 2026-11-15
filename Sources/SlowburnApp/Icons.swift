@@ -1,0 +1,99 @@
+import AppKit
+import QuotaKit
+import SwiftUI
+
+/// Brand colour of the app icon: the Claude blob's orange, a touch deeper so it holds on white and in the Dock.
+enum Brand {
+    static let orange = Color(hex: 0xFF8A57)
+    static let ink = Color(hex: 0x1B1B1B)
+}
+
+/// The app icon ("B"): the tile is the blob, with its two big eyes. One bold shape, readable at 16 px and from afar.
+/// `inset` leaves the margin macOS icons keep around the tile (100 of 1024 on each side); 0 draws the bare tile.
+struct AppIconView: View {
+    var size: CGFloat
+    var inset: CGFloat = 100.0 / 1024
+
+    var body: some View {
+        let tile = size * (1 - 2 * inset)
+        let k = tile / 100
+        ZStack {
+            RoundedRectangle(cornerRadius: tile * 0.225, style: .continuous)
+                .fill(Brand.orange)
+                .shadow(color: .black.opacity(inset > 0 ? 0.28 : 0), radius: size * 0.02, y: size * 0.012)
+            ForEach([CGFloat(35), 64], id: \.self) { x in
+                RoundedRectangle(cornerRadius: 8.5 * k, style: .continuous)
+                    .fill(Brand.ink)
+                    .frame(width: 17 * k, height: 40 * k)
+                    .rotationEffect(.degrees(-6))
+                    .offset(x: (x - 50) * k, y: -4 * k)
+            }
+        }
+        .frame(width: tile, height: tile)
+        .frame(width: size, height: size)
+    }
+}
+
+/// The menu bar icon ("D"): a thick ring that empties as the charge runs down, two calm eyes inside.
+/// The eyes never change: at menu bar size, mood shapes melt into dots; the ring carries the news.
+/// Drawn in black for a template image: the faint track is partial alpha, macOS tints the rest.
+struct MenuRing: View {
+    var level: Double
+    var size: CGFloat
+
+    var body: some View {
+        let k = size / 100
+        let line = 12 * k
+        ZStack {
+            Circle().stroke(Color.black.opacity(0.3), lineWidth: line)
+            Circle().trim(from: 0, to: max(0.04, min(level, 1)))
+                .stroke(Color.black, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            // Two upright pills with a clear gap: the blob's face, kept large enough to stay apart at 18 pt.
+            ForEach([CGFloat(-11.5), 11.5], id: \.self) { dx in
+                Capsule()
+                    .fill(Color.black)
+                    // Shorter than a pause bar and set above centre, so it reads as a face, not a "pause" glyph.
+                    .frame(width: 13 * k, height: 23 * k)
+                    .rotationEffect(.degrees(-8))
+                    .offset(x: dx * k, y: -4 * k)
+            }
+        }
+        .padding(line / 2)
+        .frame(width: size, height: size)
+    }
+}
+
+enum IconExport {
+    /// `Slowburn --export-icons dir`: AppIcon.iconset (all macOS sizes), AppIcon.icns, a 1024 PNG and the
+    /// bare tile for landings, then exits.
+    @MainActor
+    static func run(to dir: String) {
+        let base = URL(fileURLWithPath: dir, isDirectory: true)
+        let iconset = base.appendingPathComponent("AppIcon.iconset", isDirectory: true)
+        try? FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
+        for pt in [16, 32, 128, 256, 512] {
+            for scale in [1, 2] {
+                let name = scale == 1 ? "icon_\(pt)x\(pt).png" : "icon_\(pt)x\(pt)@2x.png"
+                write(AppIconView(size: CGFloat(pt)), scale: CGFloat(scale), to: iconset.appendingPathComponent(name))
+            }
+        }
+        write(AppIconView(size: 1024), scale: 1, to: base.appendingPathComponent("AppIcon-1024.png"))
+        write(AppIconView(size: 1024, inset: 0), scale: 1, to: base.appendingPathComponent("AppIcon-tile-1024.png"))
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
+        p.arguments = ["-c", "icns", iconset.path, "-o", base.appendingPathComponent("AppIcon.icns").path]
+        try? p.run()
+        p.waitUntilExit()
+        exit(0)
+    }
+
+    @MainActor
+    static func write<V: View>(_ view: V, scale: CGFloat, to url: URL) {
+        let r = ImageRenderer(content: view)
+        r.scale = scale
+        guard let tiff = r.nsImage?.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return }
+        try? png.write(to: url)
+    }
+}

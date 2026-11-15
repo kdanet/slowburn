@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- App icon "B": the tile is the blob, with its two eyes. -->
+  <rect width="100" height="100" rx="22.5" fill="#FF8A57"/>
+  <rect x="26.5" y="26" width="17" height="40" rx="8.5" fill="#1B1B1B" transform="rotate(-6 35 46)"/>
+  <rect x="55.5" y="26" width="17" height="40" rx="8.5" fill="#1B1B1B" transform="rotate(-6 64 46)"/>
+</svg>
