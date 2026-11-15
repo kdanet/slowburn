@@ -92,6 +92,17 @@ final class HoldsModel: ObservableObject {
 struct HoldQueueCard: View {
     @ObservedObject var holds: HoldsModel
     @ObservedObject var model: Model
+    /// Rendering for a snapshot or a clip, where AppKit controls can't be drawn.
+    var snapshot = false
+
+    private func fakeButton(_ title: String, prominent: Bool = false) -> some View {
+        Text(title)
+            .font(.system(size: 11.5, weight: .medium))
+            .foregroundStyle(prominent ? Color.white : Color.primary)
+            .padding(.horizontal, 9).padding(.vertical, 3)
+            .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(prominent ? Color.accentColor : Color.primary.opacity(0.14)))
+    }
 
     var body: some View {
         let count = holds.sessionsWaiting
@@ -119,16 +130,26 @@ struct HoldQueueCard: View {
                     }
                 }
             }
-            HStack(spacing: 6) {
-                Button(L("Продолжить всех", "Continue all")) { holds.releaseAll() }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                Button(L("+ 30 мин без тормоза", "+ 30 min, no brake")) { holds.releaseAndPause(model: model) }
-                    .controlSize(.small)
-                Spacer(minLength: 0)
-                Button(L("Стоп", "Stop")) { holds.stopAll() }
-                    .controlSize(.small)
-                    .help(L("Агенты аккуратно завершат ход и опишут, где остановились", "Agents wrap up their turn cleanly and describe where they stopped"))
+            if snapshot {
+                // Snapshots can't draw AppKit buttons: drawn stand-ins in the same places.
+                HStack(spacing: 6) {
+                    fakeButton(L("Продолжить всех", "Continue all"), prominent: true)
+                    fakeButton(L("+ 30 мин без тормоза", "+ 30 min, no brake"))
+                    Spacer(minLength: 0)
+                    fakeButton(L("Стоп", "Stop"))
+                }
+            } else {
+                HStack(spacing: 6) {
+                    Button(L("Продолжить всех", "Continue all")) { holds.releaseAll() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    Button(L("+ 30 мин без тормоза", "+ 30 min, no brake")) { holds.releaseAndPause(model: model) }
+                        .controlSize(.small)
+                    Spacer(minLength: 0)
+                    Button(L("Стоп", "Stop")) { holds.stopAll() }
+                        .controlSize(.small)
+                        .help(L("Агенты аккуратно завершат ход и опишут, где остановились", "Agents wrap up their turn cleanly and describe where they stopped"))
+                }
             }
             Text(holds.settings.releaseMode == .manual
                  ? L("Сами не продолжат: только по твоей кнопке. Через \(Int(holds.settings.maxWait / 60)) мин без решения — остановятся.",

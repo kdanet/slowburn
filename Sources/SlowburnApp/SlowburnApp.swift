@@ -174,7 +174,7 @@ struct PopoverView: View {
             header
             MasterSwitchCard(on: model.limitsOn) { model.setLimits($0) }
             // Switching off releases every hold, so the queue empties by itself.
-            if !holds.pending.isEmpty { HoldQueueCard(holds: holds, model: model) }
+            if !holds.pending.isEmpty { HoldQueueCard(holds: holds, model: model, snapshot: !anchored) }
             if let p = model.presentation {
                 SmartLayout(p: p, activities: model.activities, busy: model.busy,
                             onBoost: { provider, step in model.boost(provider, step) },
