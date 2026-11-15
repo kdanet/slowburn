@@ -206,9 +206,13 @@ struct BlobView: View {
     /// The moment drawn when not animating, for snapshots.
     var stillTime: Double = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Set when recording frames: every blob below draws this moment instead of the wall clock.
+    @Environment(\.blobClock) private var clock
 
     var body: some View {
-        if animate && !reduceMotion {
+        if let clock {
+            frame(Motion.at(mood, activity: activity, t: clock), t: clock)
+        } else if animate && !reduceMotion {
             TimelineView(.animation) { ctx in
                 let t = ctx.date.timeIntervalSinceReferenceDate
                 frame(Motion.at(mood, activity: activity, t: t), t: t)
@@ -333,4 +337,16 @@ func menuBarImage(provider: Provider, mood: Mood, level: Double) -> NSImage? {
     guard let image = renderer.nsImage else { return nil }
     image.isTemplate = true
     return image
+}
+
+private struct BlobClockKey: EnvironmentKey {
+    static let defaultValue: Double? = nil
+}
+
+extension EnvironmentValues {
+    /// A fixed time for every blob in the subtree, so frames can be rendered one by one into a video.
+    var blobClock: Double? {
+        get { self[BlobClockKey.self] }
+        set { self[BlobClockKey.self] = newValue }
+    }
 }

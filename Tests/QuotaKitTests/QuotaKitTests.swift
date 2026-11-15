@@ -42,6 +42,13 @@ private let codexLine = Data("""
     #expect(r.freeResets == 3)
 }
 
+@Test func testsRunInRussian() {
+    // The expectations here are Russian: run the suite as `SLOWBURN_LANG=ru swift test`.
+    #expect(Lang.current == .ru, "run the tests as SLOWBURN_LANG=ru swift test")
+    #expect(L("да", "yes") == "да")
+    #expect(Phrases.points(1.5) == "1,5")
+}
+
 @Test func russianPluralForResets() {
     #expect(Phrases.freeResets(1) == "1 бесплатный сброс")
     #expect(Phrases.freeResets(3) == "3 бесплатных сброса")

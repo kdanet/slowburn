@@ -99,7 +99,7 @@ struct HoldQueueCard: View {
             HStack(spacing: 8) {
                 Image(systemName: "pause.circle.fill").font(.system(size: 18)).foregroundStyle(.orange)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("\(count) \(agentsWord(count)) решения")
+                    Text(L("\(count) \(agentsWord(count)) решения", "\(count) \(agentsWord(count)) for a decision"))
                         .font(.system(size: 13, weight: .semibold))
                     if let reason = holds.pending.first?.reason {
                         Text(reason).font(.system(size: 10.5)).foregroundStyle(.secondary)
@@ -114,25 +114,27 @@ struct HoldQueueCard: View {
                         Text(g.project).font(.system(size: 11.5))
                         if g.count > 1 { Text("×\(g.count)").font(.system(size: 11)).foregroundStyle(.secondary) }
                         Spacer()
-                        Text("ждёт \(Phrases.duration(Date().timeIntervalSince(g.since)))")
+                        Text(L("ждёт \(Phrases.duration(Date().timeIntervalSince(g.since)))", "waiting \(Phrases.duration(Date().timeIntervalSince(g.since)))"))
                             .font(.system(size: 10.5)).foregroundStyle(.tertiary).monospacedDigit()
                     }
                 }
             }
             HStack(spacing: 6) {
-                Button("Продолжить всех") { holds.releaseAll() }
+                Button(L("Продолжить всех", "Continue all")) { holds.releaseAll() }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                Button("+ 30 мин без тормоза") { holds.releaseAndPause(model: model) }
+                Button(L("+ 30 мин без тормоза", "+ 30 min, no brake")) { holds.releaseAndPause(model: model) }
                     .controlSize(.small)
                 Spacer(minLength: 0)
-                Button("Стоп") { holds.stopAll() }
+                Button(L("Стоп", "Stop")) { holds.stopAll() }
                     .controlSize(.small)
-                    .help("Агенты аккуратно завершат ход и опишут, где остановились")
+                    .help(L("Агенты аккуратно завершат ход и опишут, где остановились", "Agents wrap up their turn cleanly and describe where they stopped"))
             }
             Text(holds.settings.releaseMode == .manual
-                 ? "Сами не продолжат: только по твоей кнопке. Через \(Int(holds.settings.maxWait / 60)) мин без решения — остановятся."
-                 : "Продолжат сами, когда вернётся бюджет, или по твоей кнопке.")
+                 ? L("Сами не продолжат: только по твоей кнопке. Через \(Int(holds.settings.maxWait / 60)) мин без решения — остановятся.",
+                     "They won't continue on their own, only on your click. After \(Int(holds.settings.maxWait / 60)) min with no decision they stop.")
+                 : L("Продолжат сами, когда вернётся бюджет, или по твоей кнопке.",
+                     "They continue on their own when the budget returns, or on your click."))
                 .font(.system(size: 10.5)).foregroundStyle(.tertiary)
         }
         .padding(12)
@@ -143,8 +145,9 @@ struct HoldQueueCard: View {
     /// "1 агент ждёт", "3 агента ждут", "7 агентов ждут", "21 агент ждёт".
     private func agentsWord(_ n: Int) -> String {
         let m10 = n % 10, m100 = n % 100
-        if m10 == 1 && m100 != 11 { return "агент ждёт" }
-        if (2...4).contains(m10) && !(12...14).contains(m100) { return "агента ждут" }
-        return "агентов ждут"
+        let en = n == 1 ? "agent waits" : "agents wait"
+        if m10 == 1 && m100 != 11 { return L("агент ждёт", en) }
+        if (2...4).contains(m10) && !(12...14).contains(m100) { return L("агента ждут", en) }
+        return L("агентов ждут", en)
     }
 }

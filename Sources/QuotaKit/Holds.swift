@@ -10,8 +10,8 @@ public enum ReleaseMode: String, Codable, Sendable, CaseIterable {
 
     public var title: String {
         switch self {
-        case .manual: "Только вручную"
-        case .whenBudgetReturns: "Когда вернётся бюджет"
+        case .manual: L("Только вручную", "Manually only")
+        case .whenBudgetReturns: L("Когда вернётся бюджет", "When the budget returns")
         }
     }
 }
@@ -199,8 +199,9 @@ extension Brake {
 
         let fullShort = pools.first { !$0.snapshot.isLongWindow && $0.reasons.contains("limit_reached") }
         if provider == .codex, let full = fullShort, (state.codexCredits?.spentLastHour ?? 0) > 0 {
-            var r = "Окно Codex заполнено до \(Phrases.time(full.snapshot.resetsAt)), дальше работа пойдёт за платные credits."
-            if let n = state.codexFreeResets, n > 0 { r += " У тебя \(Phrases.freeResets(n)) лимитов." }
+            var r = L("Окно Codex заполнено до \(Phrases.time(full.snapshot.resetsAt)), дальше работа пойдёт за платные credits.",
+                      "The Codex window is full until \(Phrases.time(full.snapshot.resetsAt)); further work will be paid in credits.")
+            if let n = state.codexFreeResets, n > 0 { r += L(" У тебя \(Phrases.freeResets(n)) лимитов.", " You have \(Phrases.freeResets(n)).") }
             return r
         }
         // Our own 5-hour limit, there even when the provider has none: the norm plus up to one more norm of savings.
@@ -208,13 +209,15 @@ extension Brake {
             guard let norm = p.fiveHourBudget, norm > 0, let spent = p.spentLast5h else { continue }
             let cap = p.fiveHourCap ?? norm
             if spent > cap + tolerance {
-                return "\(Phrases.providerName(provider)): за последние 5 часов потрачено \(Phrases.points(spent))% недели при норме \(Phrases.points(cap))% с запасом. Норма скользящая — \(p.fiveHourFreesAt.map { "снова можно в \(Phrases.time($0))" } ?? "через час-другой снова можно")."
+                return L("\(Phrases.providerName(provider)): за последние 5 часов потрачено \(Phrases.points(spent))% недели при норме \(Phrases.points(cap))% с запасом. Норма скользящая — \(p.fiveHourFreesAt.map { "снова можно в \(Phrases.time($0))" } ?? "через час-другой снова можно").",
+                         "\(Phrases.providerName(provider)): \(Phrases.points(spent))% of the week spent in the last 5 hours, over the \(Phrases.points(cap))% norm with reserve. The norm is rolling — \(p.fiveHourFreesAt.map { "you can go again at \(Phrases.time($0))" } ?? "you can go again in an hour or two").")
             }
         }
         if let over = pools.filter({ $0.snapshot.isLongWindow }).first(where: { ($0.available ?? 0) < -tolerance }),
            let a = over.available, let plan = over.plan {
             let back = now.addingTimeInterval((-a + 0.5) / max(plan.ratePerHour, 0.0001) * 3600)
-            return "\(Phrases.providerName(provider)) впереди плана на \(Phrases.points(-a))%: заряд вернётся к \(Phrases.time(back))."
+            return L("\(Phrases.providerName(provider)) впереди плана на \(Phrases.points(-a))%: заряд вернётся к \(Phrases.time(back)).",
+                     "\(Phrases.providerName(provider)) is \(Phrases.points(-a))% ahead of plan: charge returns by \(Phrases.time(back)).")
         }
         return nil
     }

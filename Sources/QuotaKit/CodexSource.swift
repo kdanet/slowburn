@@ -135,9 +135,9 @@ public enum CodexLiveSource {
 
 func windowTitle(minutes: Int) -> String {
     switch minutes {
-    case 300: "5 часов"
-    case 10080: "Неделя"
-    case 1440: "Сутки"
-    default: minutes % 60 == 0 ? "\(minutes / 60) ч" : "\(minutes) мин"
+    case 300: L("5 часов", "5 hours")
+    case 10080: L("Неделя", "Week")
+    case 1440: L("Сутки", "Day")
+    default: minutes % 60 == 0 ? L("\(minutes / 60) ч", "\(minutes / 60) h") : L("\(minutes) мин", "\(minutes) min")
     }
 }

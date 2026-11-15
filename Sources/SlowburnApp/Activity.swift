@@ -32,59 +32,59 @@ enum Activity: String, CaseIterable, Sendable {
 
     var name: String {
         switch self {
-        case .typing: "пишет ответ"
-        case .coding: "правит код"
-        case .searching: "ищет в коде"
-        case .terminal: "в терминале"
-        case .testing: "гоняет тесты"
-        case .building: "собирает"
-        case .shipping: "выкатывает"
-        case .browsing: "ищет в сети"
-        case .delegating: "раздаёт задачи"
-        case .thinking: "думает"
-        case .planning: "планирует"
-        case .debugging: "чинит ошибку"
-        case .asking: "ждёт ответа"
-        case .reading: "читает"
-        case .coffee: "пьёт кофе"
-        case .music: "слушает музыку"
-        case .juggling: "жонглирует"
-        case .bubbles: "пускает пузыри"
-        case .meditating: "медитирует"
-        case .gardening: "поливает росток"
-        case .yoyo: "играет с йо-йо"
-        case .balloon: "гуляет с шариком"
-        case .stargazing: "смотрит на звёзды"
-        case .fishing: "рыбачит"
-        case .kite: "запускает змея"
-        case .paperPlane: "пускает самолётик"
-        case .jumpRope: "прыгает через скакалку"
-        case .hulaHoop: "крутит обруч"
-        case .skateboard: "катается на скейте"
-        case .snowfall: "ловит снежинки"
-        case .butterfly: "гоняется за бабочкой"
-        case .dandelion: "дует на одуванчик"
-        case .swimRing: "плавает с кругом"
-        case .painting: "рисует"
-        case .knitting: "вяжет"
-        case .guitar: "играет на гитаре"
-        case .drums: "стучит на барабанах"
-        case .gaming: "играет в приставку"
-        case .disco: "танцует"
-        case .camera: "фотографирует"
-        case .rubik: "крутит кубик"
-        case .cardHouse: "строит домик из карт"
-        case .fishbowl: "смотрит на рыбок"
-        case .iceCream: "ест мороженое"
-        case .watermelon: "ест арбуз"
-        case .popcorn: "ест попкорн"
-        case .campfire: "жарит маршмеллоу"
-        case .sunbathing: "загорает"
-        case .rain: "гуляет под дождём"
-        case .hammock: "дремлет в гамаке"
-        case .dumbbells: "качается"
-        case .basketball: "ведёт мяч"
-        case .football: "чеканит мяч"
+        case .typing: L("пишет ответ", "writing a reply")
+        case .coding: L("правит код", "editing code")
+        case .searching: L("ищет в коде", "searching the code")
+        case .terminal: L("в терминале", "in the terminal")
+        case .testing: L("гоняет тесты", "running tests")
+        case .building: L("собирает", "building")
+        case .shipping: L("выкатывает", "shipping")
+        case .browsing: L("ищет в сети", "searching the web")
+        case .delegating: L("раздаёт задачи", "handing out tasks")
+        case .thinking: L("думает", "thinking")
+        case .planning: L("планирует", "planning")
+        case .debugging: L("чинит ошибку", "fixing a bug")
+        case .asking: L("ждёт ответа", "waiting for an answer")
+        case .reading: L("читает", "reading")
+        case .coffee: L("пьёт кофе", "drinking coffee")
+        case .music: L("слушает музыку", "listening to music")
+        case .juggling: L("жонглирует", "juggling")
+        case .bubbles: L("пускает пузыри", "blowing bubbles")
+        case .meditating: L("медитирует", "meditating")
+        case .gardening: L("поливает росток", "watering a sprout")
+        case .yoyo: L("играет с йо-йо", "playing with a yo-yo")
+        case .balloon: L("гуляет с шариком", "out with a balloon")
+        case .stargazing: L("смотрит на звёзды", "stargazing")
+        case .fishing: L("рыбачит", "fishing")
+        case .kite: L("запускает змея", "flying a kite")
+        case .paperPlane: L("пускает самолётик", "throwing a paper plane")
+        case .jumpRope: L("прыгает через скакалку", "jumping rope")
+        case .hulaHoop: L("крутит обруч", "hula-hooping")
+        case .skateboard: L("катается на скейте", "skateboarding")
+        case .snowfall: L("ловит снежинки", "catching snowflakes")
+        case .butterfly: L("гоняется за бабочкой", "chasing a butterfly")
+        case .dandelion: L("дует на одуванчик", "blowing on a dandelion")
+        case .swimRing: L("плавает с кругом", "floating on a swim ring")
+        case .painting: L("рисует", "painting")
+        case .knitting: L("вяжет", "knitting")
+        case .guitar: L("играет на гитаре", "playing guitar")
+        case .drums: L("стучит на барабанах", "playing drums")
+        case .gaming: L("играет в приставку", "playing video games")
+        case .disco: L("танцует", "dancing")
+        case .camera: L("фотографирует", "taking photos")
+        case .rubik: L("крутит кубик", "twisting a Rubik's cube")
+        case .cardHouse: L("строит домик из карт", "building a house of cards")
+        case .fishbowl: L("смотрит на рыбок", "watching the fish")
+        case .iceCream: L("ест мороженое", "eating ice cream")
+        case .watermelon: L("ест арбуз", "eating watermelon")
+        case .popcorn: L("ест попкорн", "eating popcorn")
+        case .campfire: L("жарит маршмеллоу", "roasting marshmallows")
+        case .sunbathing: L("загорает", "sunbathing")
+        case .rain: L("гуляет под дождём", "walking in the rain")
+        case .hammock: L("дремлет в гамаке", "napping in a hammock")
+        case .dumbbells: L("качается", "working out")
+        case .basketball: L("ведёт мяч", "dribbling a ball")
+        case .football: L("чеканит мяч", "doing keepy-uppies")
         }
     }
 

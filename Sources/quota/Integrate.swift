@@ -78,7 +78,8 @@ enum Integrate {
         let out = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try out.write(to: url, options: .atomic)
-        return "\(Phrases.providerName(provider)): убрано старых записей \(removed), добавлено \(added) · \(url.path)"
+        return L("\(Phrases.providerName(provider)): убрано старых записей \(removed), добавлено \(added) · \(url.path)",
+                 "\(Phrases.providerName(provider)): removed \(removed) old entries, added \(added) · \(url.path)")
     }
 
     static func run(args: [String], paths: Paths) -> Int32 {
@@ -87,15 +88,16 @@ enum Integrate {
         if providers.isEmpty { providers = uninstall ? Provider.allCases : [.claude] }
         do {
             let binary = uninstall ? nil : try installBinary(paths: paths)
-            if let binary { print("Бинарник: \(binary.path)") }
+            if let binary { print(L("Бинарник: \(binary.path)", "Binary: \(binary.path)")) }
             for p in providers { print(try apply(provider: p, binary: binary, paths: paths)) }
             if !uninstall {
-                print("Тормоз держит агентов, только пока запущено приложение Slowburn.")
-                if providers.contains(.codex) { print("Codex: разреши новые хуки в Codex Desktop, иначе он их не запустит.") }
+                print(L("Тормоз держит агентов, только пока запущено приложение Slowburn.", "The brake holds agents only while the Slowburn app is running."))
+                if providers.contains(.codex) { print(L("Codex: разреши новые хуки в Codex Desktop, иначе он их не запустит.", "Codex: allow the new hooks in Codex Desktop, or it won't run them.")) }
             }
             return 0
         } catch {
-            print("Не получилось: \(error.localizedDescription). Конфиги не тронуты, бэкапы в \(paths.support.path)/backups")
+            print(L("Не получилось: \(error.localizedDescription). Конфиги не тронуты, бэкапы в \(paths.support.path)/backups",
+                    "Failed: \(error.localizedDescription). Configs left untouched, backups in \(paths.support.path)/backups"))
             return 1
         }
     }

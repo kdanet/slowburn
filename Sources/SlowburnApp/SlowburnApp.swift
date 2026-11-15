@@ -190,7 +190,7 @@ struct PopoverView: View {
             } else {
                 HStack(spacing: 12) {
                     BlobView(provider: .claude, mood: .unknown, level: 1, size: 40)
-                    Text("Собираю цифры…").foregroundStyle(.secondary)
+                    Text(L("Собираю цифры…", "Gathering numbers…")).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 120)
             }
@@ -209,21 +209,21 @@ struct PopoverView: View {
             Text("Slowburn").font(.system(size: 13, weight: .semibold))
             Spacer()
             if let p = model.presentation {
-                Text(model.refreshing ? "обновляю…" : "обновлено \(p.freshText)")
+                Text(model.refreshing ? L("обновляю…", "updating…") : L("обновлено \(p.freshText)", "updated \(p.freshText)"))
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
             }
             if anchored {
                 Menu {
-                    Picker("Отпускать агентов", selection: $holds.settings.releaseMode) {
+                    Picker(L("Отпускать агентов", "Release agents"), selection: $holds.settings.releaseMode) {
                         ForEach(ReleaseMode.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     Divider()
-                    Button("Обновить сейчас") { Task { await model.refresh() } }
+                    Button(L("Обновить сейчас", "Refresh now")) { Task { await model.refresh() } }
                         .keyboardShortcut("r")
-                    Button("Перепланировать от текущего остатка") { model.replan() }
+                    Button(L("Перепланировать от текущего остатка", "Replan from what's left")) { model.replan() }
                     Divider()
-                    Button("Выйти из Slowburn") { NSApp.terminate(nil) }
+                    Button(L("Выйти из Slowburn", "Quit Slowburn")) { NSApp.terminate(nil) }
                         .keyboardShortcut("q")
                 } label: {
                     Image(systemName: "gearshape")
@@ -232,7 +232,7 @@ struct PopoverView: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .focusEffectDisabled()
-                .accessibilityLabel("Настройки")
+                .accessibilityLabel(L("Настройки", "Settings"))
             } else {
                 Image(systemName: "gearshape").foregroundStyle(.secondary)
             }
@@ -277,15 +277,17 @@ struct PopoverView: View {
                     .foregroundStyle(off ? Color.orange : Color.secondary)
                     .frame(width: 30)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Мягкий тормоз").font(.system(size: 12))
-                    Text(off ? "Выключен до \(Phrases.time(p.overrideUntil!)) — только предупреждаю"
-                             : "Поставит агентов на паузу, если за 5 часов съешь больше нормы, уйдёшь сверх плана недели или Codex начнёт тратить credits")
+                    Text(L("Мягкий тормоз", "Soft brake")).font(.system(size: 12))
+                    Text(off ? L("Выключен до \(Phrases.time(p.overrideUntil!)) — только предупреждаю",
+                               "Off until \(Phrases.time(p.overrideUntil!)) — warnings only")
+                             : L("Поставит агентов на паузу, если за 5 часов съешь больше нормы, уйдёшь сверх плана недели или Codex начнёт тратить credits",
+                                 "Pauses agents if you burn more than the norm in 5 hours, go over the week's plan, or Codex starts spending credits"))
                         .font(.system(size: 10.5))
                         .foregroundStyle(.tertiary)
                 }
                 Spacer()
                 if anchored {
-                    Toggle("Мягкий тормоз", isOn: Binding(get: { model.brakeOn }, set: { model.setBrake($0) }))
+                    Toggle(L("Мягкий тормоз", "Soft brake"), isOn: Binding(get: { model.brakeOn }, set: { model.setBrake($0) }))
                         .toggleStyle(.switch)
                         .controlSize(.mini)
                         .labelsHidden()
@@ -310,6 +312,9 @@ struct SlowburnApp: App {
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
             Self.snapshot(to: args[i + 1])
+        }
+        if let i = args.firstIndex(of: "--export-clip"), i + 2 < args.count {
+            IconExport.clip(to: args[i + 1], what: args[i + 2], seconds: i + 3 < args.count ? Double(args[i + 3]) ?? 4 : 4)
         }
         if let i = args.firstIndex(of: "--export-activities"), i + 2 < args.count {
             IconExport.activities(to: args[i + 1], names: args[i + 2].split(separator: ",").map(String.init))
@@ -538,10 +543,10 @@ struct MasterSwitchCard: View {
         Button { set(!on) } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(on ? "Ограничения включены" : "Ограничения выключены")
+                    Text(on ? L("Ограничения включены", "Limits on") : L("Ограничения выключены", "Limits off"))
                         .font(.system(size: 15, weight: .semibold))
-                    Text(on ? "Хуки следят за лимитами и ставят агентов на паузу"
-                            : "Агенты работают без пауз и предупреждений")
+                    Text(on ? L("Хуки следят за лимитами и ставят агентов на паузу", "Hooks watch the limits and pause agents")
+                            : L("Агенты работают без пауз и предупреждений", "Agents run with no pauses or warnings"))
                         .font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
@@ -557,8 +562,8 @@ struct MasterSwitchCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Ограничения и хуки")
-        .accessibilityValue(on ? "включены" : "выключены")
+        .accessibilityLabel(L("Ограничения и хуки", "Limits and hooks"))
+        .accessibilityValue(on ? L("включены", "on") : L("выключены", "off"))
         .accessibilityAddTraits(.isButton)
     }
 }

@@ -107,6 +107,48 @@ enum IconExport {
         exit(0)
     }
 
+    /// `Slowburn --export-clip out.mp4 <what> [seconds]`: renders frames with a fixed blob clock and encodes
+    /// them with ffmpeg (H.264, plays everywhere). `what` is `popover`, or `blob:<activity>:<claude|codex>`.
+    /// Blob clips sit on the landing's card colour, since Safari can't play transparent video.
+    @MainActor
+    static func clip(to out: String, what: String, seconds: Double) {
+        let fps = 30
+        let frames = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("slowburn-frames-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: frames, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: frames) }
+        let parts = what.split(separator: ":").map(String.init)
+        let model = parts[0] == "popover" ? Model() : nil
+        // Start late in the day so the moods, glances and props are all mid-cycle.
+        let t0 = 1000.0
+        for i in 0..<Int(seconds * Double(fps)) {
+            let t = t0 + Double(i) / Double(fps)
+            let url = frames.appendingPathComponent(String(format: "f%04d.png", i))
+            if let model {
+                write(PopoverView(model: model, anchored: false)
+                        .background(Color(white: 0.17))
+                        .environment(\.colorScheme, .dark)
+                        .environment(\.blobClock, t),
+                      scale: 2, to: url)
+            } else if parts.count >= 2, let a = Activity(rawValue: parts[1]) {
+                let provider: Provider = parts.count > 2 && parts[2] == "codex" ? .codex : .claude
+                write(BlobView(provider: provider, mood: .calm, level: 1, size: 120, activity: a)
+                        .frame(width: 240, height: 220)
+                        .background(Color(hex: 0x221E1B))
+                        .environment(\.colorScheme, .dark)
+                        .environment(\.blobClock, t),
+                      scale: 2, to: url)
+            }
+        }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/ffmpeg")
+        p.arguments = ["-y", "-loglevel", "error", "-framerate", "\(fps)", "-i", frames.appendingPathComponent("f%04d.png").path,
+                       "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "22",
+                       "-preset", "slow", "-movflags", "+faststart", out]
+        try? p.run()
+        p.waitUntilExit()
+        exit(0)
+    }
+
     @MainActor
     static func write<V: View>(_ view: V, scale: CGFloat, to url: URL) {
         let r = ImageRenderer(content: view)

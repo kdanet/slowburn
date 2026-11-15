@@ -49,7 +49,7 @@ swift build
 .build/debug/quota allow 30        # снять тормоз на 30 минут
 .build/debug/quota replan          # план от текущего остатка
 .build/debug/Slowburn             # меню-бар
-swift test
+SLOWBURN_LANG=ru swift test        # тесты проверяют русские строки
 ```
 
 Свои файлы приложение хранит в `~/Library/Application Support/Slowburn/`. Путь можно переопределить через `SLOWBURN_HOME`.

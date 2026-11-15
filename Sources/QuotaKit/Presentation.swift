@@ -7,12 +7,12 @@ public enum Mood: String, Codable, Sendable, CaseIterable {
 
     public var name: String {
         switch self {
-        case .calm: "спокоен"
-        case .charged: "заряжен"
-        case .worried: "переживает"
-        case .money: "платит"
-        case .sleepy: "спит"
-        case .unknown: "не видит"
+        case .calm: L("спокоен", "calm")
+        case .charged: L("заряжен", "charged")
+        case .worried: L("переживает", "worried")
+        case .money: L("платит", "paying")
+        case .sleepy: L("спит", "sleeping")
+        case .unknown: L("не видит", "can't see")
         }
     }
 
@@ -132,16 +132,18 @@ extension Presentation {
 
         var moneyNote: String?
         if let c = state.codexCredits, c.spentLastHour > 0 {
-            moneyNote = "Codex работает за credits: −\(Phrases.points(c.spentLastHour)) за последний час"
+            moneyNote = L("Codex работает за credits: −\(Phrases.points(c.spentLastHour)) за последний час",
+                          "Codex is spending credits: −\(Phrases.points(c.spentLastHour)) in the last hour")
         }
         // Free resets matter exactly when Codex is stuck at a limit or paying for being past it.
         var resetNote: String?
         if let n = state.codexFreeResets, n > 0, moneyNote != nil || blobs.contains(where: { $0.provider == .codex && $0.hours == 0 }) {
-            resetNote = "У тебя \(Phrases.freeResets(n)) лимитов Codex — можно обнулить окно бесплатно, вместо оплаты credits"
+            resetNote = L("У тебя \(Phrases.freeResets(n)) лимитов Codex — можно обнулить окно бесплатно, вместо оплаты credits",
+                          "You have \(Phrases.freeResets(n)) for Codex — reset the window for free instead of paying credits")
         }
 
         let newest = state.pools.map(\.snapshot.observedAt).max()
-        let freshText = newest.map { Phrases.ago(now.timeIntervalSince($0)) } ?? "нет данных"
+        let freshText = newest.map { Phrases.ago(now.timeIntervalSince($0)) } ?? L("нет данных", "no data")
 
         let limits = limitRows(state, now: now)
         // Quiet by default: the blob's face says "fine"; text appears only when something needs you.
@@ -170,7 +172,7 @@ extension Presentation {
         let fresh = state.pools(of: p).filter { $0.freshness == .fresh && $0.level != .unknown }
         guard !fresh.isEmpty else {
             return BlobModel(provider: p, mood: .unknown, hours: nil, level: 0, hoursText: "—",
-                             subtitle: "нет данных", phrase: "\(name): нет свежих цифр.")
+                             subtitle: L("нет данных", "no data"), phrase: L("\(name): нет свежих цифр.", "\(name): no fresh numbers."))
         }
 
         // Charge = the tightest long pool's earned balance, in hours of its plan; a full short window empties it.
@@ -194,29 +196,31 @@ extension Presentation {
 
         let paying = p == .codex && !fullShort.isEmpty && (state.codexCredits?.spentLastHour ?? 0) > 0
         if paying {
-            let t = backAt.map(Phrases.time) ?? "сброса"
+            let t = backAt.map(Phrases.time) ?? L("сброса", "reset")
             return BlobModel(provider: p, mood: .money, hours: hours, level: max(level, 0.04), hoursText: hoursText,
-                             subtitle: "окно до \(t)", phrase: "\(name) спит до \(t) и платит credits.")
+                             subtitle: L("окно до \(t)", "window until \(t)"),
+                             phrase: L("\(name) спит до \(t) и платит credits.", "\(name) sleeps until \(t) and pays credits."))
         }
         if worst == .red {
-            let t = backAt.map(Phrases.time) ?? "сброса"
+            let t = backAt.map(Phrases.time) ?? L("сброса", "reset")
             return BlobModel(provider: p, mood: .sleepy, hours: hours, level: max(level, 0.04), hoursText: hoursText,
-                             subtitle: "заряд к \(t)", phrase: "\(name) отдыхает до \(t).")
+                             subtitle: L("заряд к \(t)", "charged by \(t)"), phrase: L("\(name) отдыхает до \(t).", "\(name) is resting until \(t)."))
         }
         if worst == .yellow {
             let eta = fresh.filter { $0.snapshot.isLongWindow }.compactMap(\.exhaustsAt).min()
-            let phrase = eta.map { "\(name) в таком темпе кончится к \(Phrases.time($0))." }
-                ?? "\(name) тратит запас — осталось ~\(hoursText)."
+            let phrase = eta.map { L("\(name) в таком темпе кончится к \(Phrases.time($0)).", "\(name) runs out by \(Phrases.time($0)) at this pace.") }
+                ?? L("\(name) тратит запас — осталось ~\(hoursText).", "\(name) is using its reserve — ~\(hoursText) left.")
             return BlobModel(provider: p, mood: .worried, hours: hours, level: max(level, 0.04), hoursText: hoursText,
-                             subtitle: eta == nil ? "идёт запас" : "к сбросу не хватит", phrase: phrase)
+                             subtitle: eta == nil ? L("идёт запас", "using reserve") : L("к сбросу не хватит", "won't last to reset"), phrase: phrase)
         }
         if let h = hours, h >= fullHours {
             return BlobModel(provider: p, mood: .charged, hours: h, level: level, hoursText: hoursText,
-                             subtitle: "\(Phrases.hours(min(h, 5))) обычных + \(Phrases.hours(max(0, h - 5))) запаса",
-                             phrase: "\(name) накопил на ~\(hoursText).")
+                             subtitle: L("\(Phrases.hours(min(h, 5))) обычных + \(Phrases.hours(max(0, h - 5))) запаса",
+                                         "\(Phrases.hours(min(h, 5))) regular + \(Phrases.hours(max(0, h - 5))) reserve"),
+                             phrase: L("\(name) накопил на ~\(hoursText).", "\(name) has saved up ~\(hoursText)."))
         }
         return BlobModel(provider: p, mood: .calm, hours: hours, level: max(level, 0.04), hoursText: hoursText,
-                         subtitle: "по плану", phrase: "\(name) бодр — ещё ~\(hoursText).")
+                         subtitle: L("по плану", "on plan"), phrase: L("\(name) бодр — ещё ~\(hoursText).", "\(name) is fresh — ~\(hoursText) to go."))
     }
 
     static func limitRows(_ state: AppState, now: Date) -> [LimitRow] {
@@ -225,8 +229,8 @@ extension Presentation {
                     < ($1.snapshot.pool.provider == .claude ? 0 : 1, $1.snapshot.windowMinutes, $1.snapshot.pool.id) }
             .map { p in
                 let s = p.snapshot
-                var title = s.title.replacingOccurrences(of: "Неделя · ", with: "")
-                if title == "Неделя" { title = "неделя" }
+                var title = Phrases.windowTitle(s.title).replacingOccurrences(of: L("Неделя · ", "Week · "), with: "")
+                if title == L("Неделя", "Week") { title = L("неделя", "week") }
                 let marker = p.plan.map { min(100, $0.u0 + $0.earned(at: now)) }
                 let tone: LimitRow.Tone
                 if p.level == .unknown || p.freshness != .fresh {
@@ -238,7 +242,8 @@ extension Presentation {
                 } else {
                     tone = .ok
                 }
-                let reset = p.level == .unknown ? "окно сменилось" : "сброс через " + Phrases.countdown(s.resetsAt.timeIntervalSince(now))
+                let reset = p.level == .unknown ? L("окно сменилось", "window changed")
+                    : L("сброс через ", "resets in ") + Phrases.countdown(s.resetsAt.timeIntervalSince(now))
                 return LimitRow(id: s.pool.storageKey, provider: s.pool.provider,
                                 title: "\(Phrases.providerName(s.pool.provider)) · \(title)", resetText: reset,
                                 used: s.usedPercent, planMarker: marker, tone: tone,
@@ -255,31 +260,43 @@ extension Presentation {
 
 extension Phrases {
     public static func hours(_ h: Double) -> String {
-        if h >= 1 { return "\(Int(h.rounded())) ч" }
-        return h > 0 ? "<1 ч" : "0"
+        if h >= 1 { return L("\(Int(h.rounded())) ч", "\(Int(h.rounded())) h") }
+        return h > 0 ? L("<1 ч", "<1 h") : "0"
     }
 
     /// "3 д 20 ч", "1 ч 10 мин", "12 мин".
     public static func countdown(_ seconds: TimeInterval) -> String {
         let m = max(0, Int(seconds / 60))
         let d = m / 1440, h = (m % 1440) / 60, mm = m % 60
-        if d > 0 { return h == 0 ? "\(d) д" : "\(d) д \(h) ч" }
-        if h > 0 { return mm == 0 ? "\(h) ч" : "\(h) ч \(mm) мин" }
-        return "\(mm) мин"
+        if d > 0 { return h == 0 ? L("\(d) д", "\(d) d") : L("\(d) д \(h) ч", "\(d) d \(h) h") }
+        if h > 0 { return mm == 0 ? L("\(h) ч", "\(h) h") : L("\(h) ч \(mm) мин", "\(h) h \(mm) min") }
+        return L("\(mm) мин", "\(mm) min")
     }
 
     /// "1 бесплатный сброс", "3 бесплатных сброса", "5 бесплатных сбросов".
     public static func freeResets(_ n: Int) -> String {
         let mod10 = n % 10, mod100 = n % 100
-        if mod10 == 1 && mod100 != 11 { return "\(n) бесплатный сброс" }
-        if (2...4).contains(mod10) && !(12...14).contains(mod100) { return "\(n) бесплатных сброса" }
-        return "\(n) бесплатных сбросов"
+        let en = n == 1 ? "1 free reset" : "\(n) free resets"
+        if mod10 == 1 && mod100 != 11 { return L("\(n) бесплатный сброс", en) }
+        if (2...4).contains(mod10) && !(12...14).contains(mod100) { return L("\(n) бесплатных сброса", en) }
+        return L("\(n) бесплатных сбросов", en)
+    }
+
+    /// A stored window title ("Неделя", "5 hours", "Неделя · Fable") in the interface language,
+    /// so state written under the other language still reads right.
+    public static func windowTitle(_ raw: String) -> String {
+        for (ru, en) in [("Неделя", "Week"), ("5 часов", "5 hours"), ("Сутки", "Day")] {
+            for word in [ru, en] where raw == word || raw.hasPrefix(word + " · ") {
+                return L(ru, en) + raw.dropFirst(word.count)
+            }
+        }
+        return raw
     }
 
     public static func ago(_ seconds: TimeInterval) -> String {
         let s = max(0, Int(seconds))
-        if s < 60 { return "\(s) с назад" }
-        if s < 3600 { return "\(s / 60) мин назад" }
-        return "\(s / 3600) ч назад"
+        if s < 60 { return L("\(s) с назад", "\(s) s ago") }
+        if s < 3600 { return L("\(s / 60) мин назад", "\(s / 60) min ago") }
+        return L("\(s / 3600) ч назад", "\(s / 3600) h ago")
     }
 }

@@ -2,7 +2,7 @@ import BudgetCore
 import Foundation
 import QuotaKit
 
-let usage = """
+let usage = L("""
 quota — темп подписок Claude и Codex
 
   quota status [--json] [--cached]   свежие цифры (или последние сохранённые)
@@ -16,7 +16,21 @@ quota — темп подписок Claude и Codex
   quota holds                        кто сейчас ждёт решения тормоза
   quota release [id…] [--deny]       отпустить ожидающих (все или по id) или остановить их
   quota statusline                   для statusLine Claude Code: читает stdin, печатает строку
-"""
+""", """
+quota — pacing for Claude and Codex subscriptions
+
+  quota status [--json] [--cached]   fresh numbers (or the last saved ones)
+  quota refresh                      update state.json once
+  quota allow [minutes]              lift the soft brake (30 min by default)
+  quota allow --clear                bring the brake back
+  quota replan                       rebuild the plan from what is left
+  quota hook <claude|codex> [event]  for hooks: reads stdin, answers JSON
+  quota integrate [claude] [codex]   put the brake into hooks (Claude by default)
+  quota uninstall-hooks              remove everything of ours from Claude and Codex hooks
+  quota holds                        who is waiting for a brake decision right now
+  quota release [id…] [--deny]       let waiting agents go (all or by id), or stop them
+  quota statusline                   for Claude Code's statusLine: reads stdin, prints a line
+""")
 
 let args = Array(CommandLine.arguments.dropFirst())
 let monitor = Monitor()
@@ -42,42 +56,47 @@ func render(_ state: AppState) -> String {
         case .unknown: "⚪️"
         }
         var header = "\(mark) \(Phrases.providerName(provider))"
-        if let err = summary?.error { header += "  (источник: \(err))" }
+        if let err = summary?.error { header += L("  (источник: \(err))", "  (source: \(err))") }
         out.append(header)
         let pools = state.pools(of: provider)
-        if pools.isEmpty { out.append("   нет данных") }
+        if pools.isEmpty { out.append(L("   нет данных", "   no data")) }
         for p in pools {
             let s = p.snapshot
             let age = Phrases.duration(state.generatedAt.timeIntervalSince(s.observedAt))
-            var line = "   \(s.title): \(Phrases.points(s.usedPercent))% · сброс \(Phrases.time(s.resetsAt)) · подтверждено \(age) назад"
-            if p.level == .unknown { line += " · окно сменилось, ждём данных" }
+            var line = L("   \(Phrases.windowTitle(s.title)): \(Phrases.points(s.usedPercent))% · сброс \(Phrases.time(s.resetsAt)) · подтверждено \(age) назад",
+                         "   \(Phrases.windowTitle(s.title)): \(Phrases.points(s.usedPercent))% · resets \(Phrases.time(s.resetsAt)) · confirmed \(age) ago")
+            if p.level == .unknown { line += L(" · окно сменилось, ждём данных", " · window changed, waiting for data") }
             out.append(line)
             if let a = p.available, let b5 = p.fiveHourBudget, let plan = p.plan {
-                out.append("     план: \(Phrases.points(plan.ratePerHour * 24)) п./сутки, 5ч-норма \(Phrases.points(b5)) п.")
-                out.append("     запас \(Phrases.points(a)) п. = обычный \(Phrases.points(p.normal ?? 0)) + батарейка \(Phrases.points(p.battery ?? 0)) (~\(Phrases.duration((p.batteryHours ?? 0) * 3600)))")
-                out.append("     за 5 часов: \(Phrases.points(p.spentLast5h ?? 0)) п.")
+                out.append(L("     план: \(Phrases.points(plan.ratePerHour * 24)) п./сутки, 5ч-норма \(Phrases.points(b5)) п.",
+                             "     plan: \(Phrases.points(plan.ratePerHour * 24)) pts/day, 5h norm \(Phrases.points(b5)) pts"))
+                out.append(L("     запас \(Phrases.points(a)) п. = обычный \(Phrases.points(p.normal ?? 0)) + батарейка \(Phrases.points(p.battery ?? 0)) (~\(Phrases.duration((p.batteryHours ?? 0) * 3600)))",
+                             "     headroom \(Phrases.points(a)) pts = regular \(Phrases.points(p.normal ?? 0)) + battery \(Phrases.points(p.battery ?? 0)) (~\(Phrases.duration((p.batteryHours ?? 0) * 3600)))"))
+                out.append(L("     за 5 часов: \(Phrases.points(p.spentLast5h ?? 0)) п.", "     last 5 hours: \(Phrases.points(p.spentLast5h ?? 0)) pts"))
             }
             if let burn = p.burnPerHour {
-                var f = "     темп \(Phrases.points(burn)) п./ч"
-                if let eta = p.exhaustsAt { f += " → 100% к \(Phrases.time(eta))" }
-                else if let proj = p.projectedAtReset { f += " → к сбросу ~\(Phrases.points(min(proj, 100)))%" }
+                var f = L("     темп \(Phrases.points(burn)) п./ч", "     pace \(Phrases.points(burn)) pts/h")
+                if let eta = p.exhaustsAt { f += L(" → 100% к \(Phrases.time(eta))", " → 100% by \(Phrases.time(eta))") }
+                else if let proj = p.projectedAtReset { f += L(" → к сбросу ~\(Phrases.points(min(proj, 100)))%", " → ~\(Phrases.points(min(proj, 100)))% at reset") }
                 out.append(f)
             }
             if p.level >= .yellow { out.append("     ⚠︎ \(Phrases.reason(p, now: state.generatedAt))") }
         }
     }
     if let c = state.codexCredits {
-        var line = "Codex credits: \(String(format: "%.1f", c.balance)) · за час −\(String(format: "%.1f", c.spentLastHour)) · за сутки −\(String(format: "%.1f", c.spent24h))"
+        var line = L("Codex credits: \(String(format: "%.1f", c.balance)) · за час −\(String(format: "%.1f", c.spentLastHour)) · за сутки −\(String(format: "%.1f", c.spent24h))",
+                     "Codex credits: \(String(format: "%.1f", c.balance)) · last hour −\(String(format: "%.1f", c.spentLastHour)) · last day −\(String(format: "%.1f", c.spent24h))")
         if c.spentLastHour > 0 { line = "💸 " + line }
         out.append(line)
     }
     if !state.claudeTokens24h.isEmpty {
-        out.append("Claude, токены за 24 ч:")
+        out.append(L("Claude, токены за 24 ч:", "Claude, tokens in 24 h:"))
         for (model, c) in state.claudeTokens24h.sorted(by: { $0.value.total > $1.value.total }) {
-            out.append("   \(model): \(c.messages) отв. · вход \(c.input) · кеш чт. \(c.cacheRead) · кеш зап. \(c.cacheWrite) · выход \(c.output)")
+            out.append(L("   \(model): \(c.messages) отв. · вход \(c.input) · кеш чт. \(c.cacheRead) · кеш зап. \(c.cacheWrite) · выход \(c.output)",
+                         "   \(model): \(c.messages) replies · in \(c.input) · cache read \(c.cacheRead) · cache write \(c.cacheWrite) · out \(c.output)"))
         }
     }
-    if let until = state.overrideUntil { out.append("Тормоз снят до \(Phrases.time(until))") }
+    if let until = state.overrideUntil { out.append(L("Тормоз снят до \(Phrases.time(until))", "Brake off until \(Phrases.time(until))")) }
     return out.joined(separator: "\n")
 }
 
@@ -85,7 +104,7 @@ func run() async -> Int32 {
     switch args.first {
     case "status":
         let state = args.contains("--cached") ? monitor.readState() : await monitor.refresh(now: now)
-        guard let state else { print("Нет сохранённого состояния. Запусти quota refresh."); return 1 }
+        guard let state else { print(L("Нет сохранённого состояния. Запусти quota refresh.", "No saved state. Run quota refresh.")); return 1 }
         if args.contains("--json") {
             let data = try! JSONFile.encoder.encode(state)
             FileHandle.standardOutput.write(data)
@@ -94,23 +113,24 @@ func run() async -> Int32 {
             print(render(state))
             let busy = AgentActivity.scan(paths: monitor.paths, now: now)
             let words = Provider.allCases.map { p in
-                guard let b = busy[p] else { return "\(Phrases.providerName(p)) отдыхает" }
-                return "\(Phrases.providerName(p)) работает: \(b.work.rawValue)" + (b.sessions > 1 ? " (сессий: \(b.sessions))" : "")
+                guard let b = busy[p] else { return L("\(Phrases.providerName(p)) отдыхает", "\(Phrases.providerName(p)) is resting") }
+                return L("\(Phrases.providerName(p)) работает: \(b.work.rawValue)", "\(Phrases.providerName(p)) working: \(b.work.rawValue)")
+                    + (b.sessions > 1 ? L(" (сессий: \(b.sessions))", " (sessions: \(b.sessions))") : "")
             }
-            print("Агенты: " + words.joined(separator: " · "))
+            print(L("Агенты: ", "Agents: ") + words.joined(separator: " · "))
         }
     case "refresh":
         let state = await monitor.refresh(now: now)
-        print("ok: \(state.pools.count) окон")
+        print(L("ok: \(state.pools.count) окон", "ok: \(state.pools.count) windows"))
     case "allow":
         if args.contains("--clear") {
             monitor.clearOverride()
-            print("Тормоз снова включён")
+            print(L("Тормоз снова включён", "Brake back on"))
         } else {
             let minutes = args.dropFirst().first.flatMap(Double.init) ?? 30
             try? monitor.allow(minutes: minutes, now: now)
             await monitor.refresh(now: now)
-            print("Тормоз снят на \(Phrases.duration(minutes * 60))")
+            print(L("Тормоз снят на \(Phrases.duration(minutes * 60))", "Brake off for \(Phrases.duration(minutes * 60))"))
         }
     case "replan":
         try? monitor.replan()
@@ -126,9 +146,10 @@ func run() async -> Int32 {
         return Integrate.run(args: args, paths: monitor.paths)
     case "holds":
         let pending = HoldQueue.pending(paths: monitor.paths)
-        if pending.isEmpty { print("Никто не ждёт") }
+        if pending.isEmpty { print(L("Никто не ждёт", "Nobody is waiting")) }
         for r in pending {
-            print("\(r.id.prefix(8))  \(Phrases.providerName(r.provider)) · \(r.project) · \(r.tool ?? "сообщение") · ждёт \(Phrases.duration(now.timeIntervalSince(r.createdAt)))")
+            print(L("\(r.id.prefix(8))  \(Phrases.providerName(r.provider)) · \(r.project) · \(r.tool ?? "сообщение") · ждёт \(Phrases.duration(now.timeIntervalSince(r.createdAt)))",
+                    "\(r.id.prefix(8))  \(Phrases.providerName(r.provider)) · \(r.project) · \(r.tool ?? "message") · waiting \(Phrases.duration(now.timeIntervalSince(r.createdAt)))"))
         }
     case "release":
         let deny = args.contains("--deny")
@@ -137,7 +158,7 @@ func run() async -> Int32 {
         let pending = HoldQueue.pending(paths: monitor.paths)
         let chosen = ids.isEmpty ? pending : pending.filter { r in ids.contains { r.id.hasPrefix($0) } }
         for r in chosen { HoldQueue.decide(r.id, d, paths: monitor.paths) }
-        print("\(deny ? "Остановлено" : "Отпущено"): \(chosen.count)")
+        print(L("\(deny ? "Остановлено" : "Отпущено"): \(chosen.count)", "\(deny ? "Stopped" : "Released"): \(chosen.count)"))
     case "statusline":
         let input = readStdin()
         if let obj = (try? JSONSerialization.jsonObject(with: input)) as? [String: Any],

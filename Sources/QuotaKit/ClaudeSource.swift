@@ -13,11 +13,11 @@ public enum ClaudeSource {
 
     static func title(for key: String) -> String {
         switch key {
-        case "five_hour": "5 часов"
-        case "seven_day": "Неделя"
+        case "five_hour": L("5 часов", "5 hours")
+        case "seven_day": L("Неделя", "Week")
         default:
             if key.hasPrefix("seven_day_") {
-                "Неделя · " + key.dropFirst("seven_day_".count).capitalized
+                L("Неделя · ", "Week · ") + key.dropFirst("seven_day_".count).capitalized
             } else {
                 key
             }

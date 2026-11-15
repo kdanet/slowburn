@@ -26,14 +26,14 @@ enum Hook {
             HoldQueue.clearStopped(session, paths: paths)
             if prompt?.hasPrefix(HoldQueue.demoPrefix) == true { HoldQueue.registerDemo(session, paths: paths, now: now) }
         } else if HoldQueue.isStopped(session, paths: paths, now: now) {
-            respond(.deny, message: stopInstruction("Сессия остановлена в Slowburn."), isPrompt: false, session: session, paths: paths)
+            respond(.deny, message: stopInstruction(L("Сессия остановлена в Slowburn.", "Session stopped in Slowburn.")), isPrompt: false, session: session, paths: paths)
             return
         }
 
         guard let beat = HoldQueue.heartbeat(paths: paths), beat.isFresh(now: now) else { return } // no app, no holding
         let state = monitor.readState()
         let demo = !isPrompt && HoldQueue.isDemo(session, paths: paths, now: now)
-            ? "Демо тормоза: так выглядит пауза, когда кончается бюджет." : nil
+            ? L("Демо тормоза: так выглядит пауза, когда кончается бюджет.", "Brake demo: this is what a pause looks like when the budget runs out.") : nil
         guard let reason = Brake.holdReason(state: state, provider: provider, now: now, tolerance: beat.settings.tolerance) ?? demo else {
             if isPrompt, case .warn(let m) = Brake.decide(state: state, provider: provider, prompt: prompt, now: now) {
                 printJSON(["systemMessage": "◔ " + m])
@@ -41,7 +41,7 @@ enum Hook {
             return
         }
         if isPrompt, prompt?.hasPrefix(Brake.bypassPrefix) == true {
-            printJSON(["systemMessage": "◔ Обход тормоза (++). " + reason])
+            printJSON(["systemMessage": L("◔ Обход тормоза (++). ", "◔ Brake bypassed (++). ") + reason])
             return
         }
 
@@ -69,14 +69,14 @@ enum Hook {
             Thread.sleep(forTimeInterval: 0.5)
             let now = Date()
             if let d = HoldQueue.decision(request.id, paths: paths) {
-                return (d.verdict, d.message ?? (d.verdict == .deny ? stopInstruction("Остановлено в Slowburn.") : nil))
+                return (d.verdict, d.message ?? (d.verdict == .deny ? stopInstruction(L("Остановлено в Slowburn.", "Stopped in Slowburn.")) : nil))
             }
             guard let beat = HoldQueue.heartbeat(paths: paths), now.timeIntervalSince(beat.at) <= 60 else {
-                return (.deny, stopInstruction("Slowburn закрылся, решить про паузу некому."))
+                return (.deny, stopInstruction(L("Slowburn закрылся, решить про паузу некому.", "Slowburn has quit; nobody is left to decide on the pause.")))
             }
             if now.timeIntervalSince(request.createdAt) >= beat.settings.maxWait {
                 let minutes = Int(beat.settings.maxWait / 60)
-                return (.deny, stopInstruction("Пауза длилась \(minutes) мин без решения."))
+                return (.deny, stopInstruction(L("Пауза длилась \(minutes) мин без решения.", "The pause lasted \(minutes) min with no decision.")))
             }
             if beat.settings.releaseMode == .whenBudgetReturns, now.timeIntervalSince(lastStateCheck) >= 5 {
                 lastStateCheck = now
@@ -90,12 +90,13 @@ enum Hook {
 
     /// What the agent reads when it is stopped: finish cleanly, call nothing else.
     static func stopInstruction(_ why: String) -> String {
-        "Slowburn: бюджет на паузе. \(why) Не вызывай больше инструментов: коротко опиши, на чём остановился и что осталось сделать. Пользователь продолжит позже."
+        L("Slowburn: бюджет на паузе. \(why) Не вызывай больше инструментов: коротко опиши, на чём остановился и что осталось сделать. Пользователь продолжит позже.",
+          "Slowburn: the budget is paused. \(why) Do not call any more tools: briefly describe where you stopped and what is left to do. The user will continue later.")
     }
 
     static func respond(_ verdict: HoldVerdict, message: String?, isPrompt: Bool, session: String, paths: Paths) {
         guard verdict == .deny else { return } // allow = no output: the host's normal permission flow continues
-        let text = message ?? stopInstruction("Остановлено в Slowburn.")
+        let text = message ?? stopInstruction(L("Остановлено в Slowburn.", "Stopped in Slowburn."))
         if isPrompt {
             printJSON(["decision": "block", "reason": "◔ " + text])
         } else {
