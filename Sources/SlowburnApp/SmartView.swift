@@ -369,11 +369,12 @@ struct SmartLayout: View {
         let auto = main.fiveHourAuto
         func pillLabel(_ ink: Color) -> some View {
             HStack(spacing: 8) {
-                Text(extraText).font(.system(size: 13.5, weight: .semibold)).monospacedDigit()
-                // Auto: the reserve's checkbox decides, so no ✕ here — just say where it comes from.
+                // Auto: the whole reserve backs the bar, so "+1200%" would mean nothing — the word says it all,
+                // and the tooltip keeps the numbers. Manual top-ups show how much, with ✕ to give it back.
                 if auto {
-                    Text(L("авто", "auto")).font(.system(size: 12, weight: .medium)).opacity(0.75)
+                    Text(L("авто", "auto")).font(.system(size: 13.5, weight: .semibold))
                 } else {
+                    Text(extraText).font(.system(size: 13.5, weight: .semibold)).monospacedDigit()
                     Image(systemName: "xmark").font(.system(size: 10, weight: .bold)).opacity(0.7)
                 }
             }

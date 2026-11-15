@@ -1,73 +1,84 @@
 # Slowburn
 
-Меню-бар и CLI для macOS, которые следят за темпом подписок Claude и Codex и мягко тормозят новые prompt'ы, когда ты опережаешь план.
+**English** · [Русский](README.ru.md)
 
-## Что уже работает
+**Burn your AI limits slowly.** Slowburn is a macOS menu bar app that paces your Claude Code and Codex subscription limits so they last all week. It shows how much runway you have right now, saves up what you don't use, and — if you want — pauses your agents before they spend tomorrow's budget.
 
-- **Codex:** проценты 5h и недели, баланс credits и число бесплатных сбросов лимитов. Два источника:
-  1. живой — `chatgpt.com/backend-api/wham/usage` раз в 2 минуты, с токеном из `~/.codex/auth.json`; токен только читается и никогда не обновляется;
-  2. логи — `~/.codex/sessions/**/rollout-*.jsonl`, которые Codex Desktop пишет после каждого turn'а.
+[Website](https://kdanet.github.io/slowburn/) · MIT license · macOS 14+
 
-  Логи сами по себе стоят на месте, пока Codex простаивает, а окно usage в Codex Desktop может показывать кеш. Источником истины считается сервер.
-- **Claude:** проценты недельных пулов (общий и Fable). Claude Desktop не вызывает `statusLine`, поэтому источники такие (подробнее ниже):
-  1. usage endpoint с токеном Claude Code CLI из Keychain — только чтение и только пока токен не истёк;
-  2. `claude -p /usage` — локальная команда официального CLI, без вызова модели, сама обновляет свой токен.
+<p>
+  <img src="docs/assets/ui/card-claude.png" width="380" alt="The Claude card: the 5-hour bar with a reserve top-up, the week against the plan, and the reserve">
+  <img src="docs/assets/ui/hold.png" width="380" alt="Claude is waiting for you: Continue, +30 min, Stop">
+</p>
 
-  Токены по моделям берутся из `~/.claude/projects/**/*.jsonl`.
-- **Темп** (`BudgetCore`): непрерывное начисление от текущего остатка, скользящая 5h-норма, батарейка (`обычный + батарейка = заработанный остаток`), прогноз исчерпания, свежесть данных.
-- **Мягкий тормоз** (`quota hook`): действует только на `UserPromptSubmit`.
-  - 🟢 — ничего не происходит.
-  - 🟡 — предупреждение через `systemMessage`.
-  - 🔴 — отказ с объяснением. Обойти можно двумя способами: `++` в начале сообщения или выключить «Мягкий тормоз» в меню на 30 минут.
-  - Если монитор не запущен (state старше 15 мин), хук всё пропускает.
+## Install
 
-## Тормоз: пауза агентов с решением в приложении
+```sh
+curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh
+```
 
-`quota integrate claude codex` копирует бинарник в `~/Library/Application Support/Slowburn/bin/quota` и ставит его на `UserPromptSubmit` и `PreToolUse` (лимит хука — 60 мин). Чужие хуки остаются, бэкапы лежат в `…/Slowburn/backups`. Убрать — `quota uninstall-hooks`.
+The script builds Slowburn from source on your Mac (nothing prebuilt is downloaded), puts `Slowburn.app` in `~/Applications`, starts it, and starts it again at login. Run it again to update. It needs macOS 14+, git and Swift 6 — Xcode 16 or later, or its Command Line Tools (`xcode-select --install`).
 
-- **Когда держит.** Только в двух случаях:
-  - умный лимит перерасходован больше чем на 1%;
-  - Codex упёрся в окно и пойдёт тратить credits.
+Optional — the soft brake for Claude Code and Codex:
 
-  Иначе — тишина или тихое предупреждение.
-- **Как держит.** Каждый агент встаёт перед следующим вызовом инструмента и ждёт решения: `holds/<id>.json` → `holds/<id>.decision`. Токены в это время не тратятся.
-- **Кто решает.** Приложение: «Продолжить всех», «+ 30 мин без тормоза» или «Стоп». «Стоп» — агент получает отказ с просьбой коротко описать, где остановился, и до твоего следующего сообщения в эту сессию не работает. Из терминала — `quota holds` и `quota release [--deny]`.
-- **Режимы отпускания** (⚙︎ → «Отпускать агентов»):
-  - «Только вручную» (по умолчанию);
-  - «Когда вернётся бюджет».
+```sh
+~/Applications/Slowburn.app/Contents/MacOS/quota integrate claude codex
+```
 
-  Через 55 минут без решения агенты получают «стоп», а не «продолжай».
-- **Без приложения не держит.** Если пульс в `heartbeat.json` старше 30 секунд, хук пропускает всё сразу.
-- **Обход.** `++` в начале сообщения.
-- **Попробовать.** Начни сессию сообщением `#brake-demo …` — она будет вставать на паузу на каждом вызове инструмента в течение часа. Другие сессии демо не затрагивает.
+Uninstall (keeps your history unless you remove `~/Library/Application Support/Slowburn` too):
 
-## Команды
+```sh
+curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh -s -- --uninstall
+```
+
+## What it does
+
+- **Runway, not percentages.** For each provider: a rolling **5-hour** bar (how much of a healthy five-hour stretch you've used, and when it frees up), the **week** against an even plan, and a **reserve** — what lighter hours saved.
+- **Borrow from the reserve.** Press **+** to lend the 5-hour limit a bit more for the next five hours, or tick *Draw from the reserve automatically*.
+- **Soft brake.** With the hooks installed, Claude Code and Codex pause before a prompt or tool call when you're over the plan. They wait in the menu bar: **Continue**, **+30 min** without the brake, or **Stop** (the agent wraps up and writes down where it stopped). Start a message with `++` to skip the brake once.
+- **One big switch.** *Limits on/off* at the top of the panel: off, every hook lets everything through and Slowburn just keeps counting.
+- **Companions.** An orange blob for Claude and a violet one for Codex. While an agent works, its blob sits at the laptop doing what the agent does (editing code, running tests, searching the web…), read live from the session log. Between tasks it picks one of forty pastimes.
+- **English and Russian**, following the system language (`SLOWBURN_LANG=en|ru` overrides it).
+
+## Privacy and where the numbers come from
+
+Everything runs on your Mac. No account, no analytics, no AI calls.
+
+- **Claude:** the usage endpoint the official CLI uses, with the Claude Code CLI's own access token from the Keychain — read-only, and never refreshed by Slowburn so the CLI is never logged out. When that token has expired, Slowburn runs `claude -p /usage` (a local command, no model call, no cost), which lets the CLI refresh its own token. No separate token is needed.
+- **Codex:** `chatgpt.com/backend-api/wham/usage` with the token from `~/.codex/auth.json` (read-only), plus the session logs Codex writes in `~/.codex/sessions`.
+- **What agents are doing:** the tail of the session logs in `~/.claude/projects` and `~/.codex/sessions`.
+
+Slowburn keeps its own files in `~/Library/Application Support/Slowburn/` (`SLOWBURN_HOME` overrides it).
+
+## The soft brake in detail
+
+`quota integrate claude codex` installs a hook on `UserPromptSubmit` and `PreToolUse` in `~/.claude/settings.json` and `~/.codex/hooks.json`. It touches only its own entries and backs up each config first; `quota uninstall-hooks` removes them.
+
+- It holds only when the 5-hour limit or the week's plan is overspent, or when Codex is about to work on paid credits. Otherwise it stays quiet or adds a short warning.
+- A held agent waits for a decision in the app. After 55 minutes without one, it is told to stop — never to carry on spending.
+- Without a running Slowburn nothing is ever held.
+- Try it: start a session with `#brake-demo …` and every tool call in it pauses for an hour.
+
+## Command line
+
+```sh
+quota status            # fresh numbers and what the agents are doing
+quota allow 30          # take the brake off for 30 minutes
+quota replan            # start the plan again from what's left now
+quota holds             # agents waiting for a decision
+quota release [--deny]  # let them go, or stop them
+```
+
+## Building from source
 
 ```sh
 swift build
-.build/debug/quota status          # свежие цифры
-.build/debug/quota allow 30        # снять тормоз на 30 минут
-.build/debug/quota replan          # план от текущего остатка
-.build/debug/Slowburn             # меню-бар
-SLOWBURN_LANG=ru swift test        # тесты проверяют русские строки
+.build/debug/Slowburn &            # the menu bar app
+SLOWBURN_LANG=ru swift test        # tests check the Russian strings
 ```
 
-Свои файлы приложение хранит в `~/Library/Application Support/Slowburn/`. Путь можно переопределить через `SLOWBURN_HOME`.
+Rendering helpers for docs: `--snapshot out`, `--moods out.png`, `--activities out.png [names]`, `--export-ui dir`, `--export-clip out.mp4 popover|blob:<activity>:<claude|codex>`, `--export-icons dir`.
 
-Раньше приложение называлось Claudergy. При первом запуске папка `…/Application Support/Claudergy` переезжает в `…/Slowburn`, а на старом месте остаётся ссылка, поэтому хуки со старым путём продолжают работать. `quota integrate claude codex` перепишет их на новый путь. Старая переменная `CLAUDERGY_HOME` тоже понимается.
+## License
 
-## Откуда берутся проценты Claude
-
-Отдельный токен не нужен. Токен от `claude setup-token` не подходит: у него нет прав `user:profile`, и usage endpoint отвечает 403.
-
-Сначала монитор читает access token CLI из Keychain (`Claude Code-credentials`) и запрашивает endpoint не чаще раза в минуту. Токен он никогда не обновляет сам, чтобы не разлогинить CLI.
-
-Если токен истёк, монитор раз в 3 минуты запускает `claude -p /usage --no-session-persistence --setting-sources project`:
-- это локальная команда, стоимость 0 и `num_turns 0`;
-- пользовательские хуки при этом не срабатывают;
-- в `~/.claude/projects` ничего не сохраняется;
-- CLI попутно обновляет свой токен, и endpoint снова начинает работать.
-
-## Этап 0: временные логирующие хуки
-
-`probes/install_probes.py install|uninstall` добавляет и удаляет только свои записи в `~/.claude/settings.json` и `~/.codex/hooks.json`. Бэкапы лежат в `probes/backups/`, логи — в `probes/logs/`.
+MIT. Slowburn is an independent project, not affiliated with Anthropic or OpenAI. Claude and Codex are trademarks of their owners.
