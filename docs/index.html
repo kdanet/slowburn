@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Slowburn — never hit the Claude limit on a Wednesday again</title>
+<title>Slowburn — burn your AI limits slowly</title>
 <meta name="description" content="A tiny macOS menu bar app for Claude Code and Codex. It paces your weekly limits, pauses agents before they burn through them, and shows what they're doing with two little blobs.">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-<meta property="og:title" content="Slowburn — never hit the Claude limit on a Wednesday again">
+<meta property="og:title" content="Slowburn — burn your AI limits slowly">
 <meta property="og:description" content="Paces your Claude Code and Codex limits so they last all week. Free, open source, lives in your menu bar.">
 <meta property="og:image" content="https://kdanet.github.io/slowburn/assets/icon.png">
 <meta name="twitter:card" content="summary">
@@ -54,9 +54,11 @@ h1 em{font-style:normal;background:linear-gradient(92deg,#FFC08F,#FF8A57 45%,#FF
 
 /* the real app, hanging from a menu bar */
 .drop{justify-self:center;width:100%;max-width:440px}
-.mbar{overflow:hidden;white-space:nowrap;height:30px;border-radius:10px;background:rgba(30,26,24,.85);border:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:0 12px;font-size:12.5px;color:#e9e3dc;backdrop-filter:blur(10px)}
+.mbar{overflow:hidden;white-space:nowrap;height:28px;border-radius:9px;background:rgba(36,31,28,.8);border:1px solid var(--line);display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:0 10px 0 14px;font-size:13px;font-weight:500;color:#ece6df;backdrop-filter:blur(14px)}
+.mbar .mi{width:17px;height:17px;color:#ece6df;opacity:.92;flex:none}
+.mbar .clock{letter-spacing:.01em}
 .mbar .faint{opacity:.5}
-.mbar .ring{display:flex;align-items:center;gap:5px;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.12)}
+.mbar .ring{display:flex;align-items:center;justify-content:center;width:30px;height:22px;border-radius:6px;background:rgba(255,255,255,.2)}
 .ring .arc{stroke-dasharray:276.5;animation:drain 12s ease-in-out infinite alternate}
 @keyframes drain{from{stroke-dashoffset:25}to{stroke-dashoffset:190}}
 .panel{position:relative;margin:10px auto 0;width:380px;max-width:100%;border-radius:16px;overflow:hidden;border:1px solid var(--line2);box-shadow:0 40px 100px rgba(0,0,0,.6);background:#2b2b2b;
@@ -77,7 +79,7 @@ h2{font-size:clamp(32px,4.2vw,50px);letter-spacing:-.035em;line-height:1.05;marg
 .row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:64px;align-items:center}
 .row.flip>.shot{order:-1}
 .shot{position:relative;display:grid;place-items:center;padding:42px 28px;border-radius:26px;background:radial-gradient(90% 90% at 50% 0%,rgba(255,138,87,.12),transparent 70%),var(--card);border:1px solid var(--line)}
-.shot img{width:100%;max-width:380px;border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+.shot img{width:100%;max-width:380px;filter:drop-shadow(0 24px 40px rgba(0,0,0,.5))}
 .shot .glass{background:#2b2b2b;border-radius:16px;padding:6px;box-shadow:0 24px 60px rgba(0,0,0,.45);border:1px solid var(--line2);width:100%;max-width:392px}
 .shot .glass img{box-shadow:none;border-radius:12px}
 .notes{list-style:none;margin:26px 0 0;padding:0}
@@ -150,16 +152,18 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   <div class="top">
     <div>
       <span class="pill"><b>new</b> for Claude Code and Codex</span>
-      <h1>Never hit the limit on a Wednesday <em>again.</em></h1>
+      <h1>Burn your AI limits <em>slowly.</em></h1>
       <p class="lead">Slowburn lives in your menu bar and <b>paces your Claude Code and Codex limits</b> so they last all week. One glance tells you how much runway you have — and when an agent is about to burn tomorrow's budget, you get to decide.</p>
       <div class="cta"><a class="btn primary" href="#install">Get Slowburn — free</a><a class="btn ghost" href="#features">See how it works</a></div>
       <p class="fine">Open source · macOS 14+ · one-line install · no account, no telemetry</p>
     </div>
     <div class="drop">
-      <div class="mbar" role="img" aria-label="The Slowburn ring in the macOS menu bar">
-        <span class="faint">Wi-Fi</span>
-        <span class="ring"><svg width="16" height="16" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="12"/><circle class="arc" cx="50" cy="50" r="44" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" transform="rotate(-90 50 50)"/><rect x="32" y="34.5" width="13" height="23" rx="6.5" fill="#fff" transform="rotate(-8 38.5 46)"/><rect x="55" y="34.5" width="13" height="23" rx="6.5" fill="#fff" transform="rotate(-8 61.5 46)"/></svg>~5 h</span>
-        <span class="faint mono">Wed 14:20</span>
+      <div class="mbar" role="img" aria-label="The Slowburn ring in the macOS menu bar, selected">
+        <svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 9.5a14 14 0 0 1 19 0M5.5 12.8a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="19.3" r="1.6" fill="currentColor"/></svg>
+        <svg class="mi" viewBox="0 0 30 24" aria-hidden="true"><rect x="1.5" y="6" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".55"/><rect x="4" y="8.5" width="15" height="7" rx="1.6" fill="currentColor"/><path d="M26.5 10.5v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg>
+        <svg class="mi" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="6" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="7" cy="7.5" r="1.8" fill="currentColor"/><rect x="3" y="13.5" width="18" height="6" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="16.5" r="1.8" fill="currentColor"/></svg>
+        <span class="ring"><svg width="16" height="16" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="12"/><circle class="arc" cx="50" cy="50" r="44" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" transform="rotate(-90 50 50)"/><rect x="32" y="34.5" width="13" height="23" rx="6.5" fill="#fff" transform="rotate(-8 38.5 46)"/><rect x="55" y="34.5" width="13" height="23" rx="6.5" fill="#fff" transform="rotate(-8 61.5 46)"/></svg></span>
+        <span class="clock">Wed 14:20</span>
       </div>
       <div class="panel"><video src="assets/video/app.mp4" poster="assets/app-poster.png" autoplay muted loop playsinline aria-label="The Slowburn panel: the limits switch, the 5-hour bar with a reserve top-up, the week and the reserve for Claude and Codex, with two blobs moving next to their status"></video></div>
     </div>
@@ -178,7 +182,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       <li><span class="dot" style="background:var(--green)"></span><span><b>Reserve</b> — what light days saved. Press <b>+</b> to borrow it when you're on a roll.</span></li>
     </ul>
   </div>
-  <div class="shot reveal"><div class="glass"><img src="assets/ui-bars.png" alt="The 5-hour bar at 103% with a +21% reserve top-up, the week at 45% with the plan tick, and a 3.9% reserve"></div></div>
+  <div class="shot reveal"><img src="assets/ui/card-claude.png" alt="The Claude card: work at ease, the 5-hour bar at 65% with a +21% reserve top-up, the week at 43% under the plan tick, and a 6% reserve"></div>
 </div></section>
 
 <section class="alt"><div class="wrap row flip">
@@ -191,7 +195,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       <li><span class="dot" style="background:var(--orange)"></span><span><b>Start a message with ++</b> to skip the brake once.</span></li>
     </ul>
   </div>
-  <div class="shot reveal"><img src="assets/ui-hold.png" alt="A card saying one agent waits for a decision, with Continue all, + 30 min no brake, and Stop"></div>
+  <div class="shot reveal"><img src="assets/ui/hold.png" alt="A card saying one agent waits for a decision, with Continue all, + 30 min no brake, and Stop"></div>
 </div></section>
 
 <section><div class="wrap row">
@@ -200,7 +204,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <h2>One switch when you need to go all in.</h2>
     <p class="sub">Turn the limits off and every hook steps aside. Slowburn keeps counting quietly, so you'll know exactly what the sprint cost. Turn it back on when the dust settles.</p>
   </div>
-  <div class="shot reveal"><div class="glass"><img src="assets/ui-switch.png" alt="The Limits on switch at the top of the Slowburn panel"></div></div>
+  <div class="shot reveal"><img src="assets/ui/switch.png" alt="The Limits on switch at the top of the Slowburn panel"></div>
 </div></section>
 
 <section id="companions" class="alt"><div class="wrap">

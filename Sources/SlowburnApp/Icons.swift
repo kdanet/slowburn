@@ -149,6 +149,38 @@ enum IconExport {
         exit(0)
     }
 
+    /// `Slowburn --export-ui dir`: pieces of the panel rendered on their own, each as a small panel with even
+    /// padding and rounded corners (for the landing): the Claude and Codex cards, the waiting-agents card, the switch.
+    @MainActor
+    static func ui(to dir: String) {
+        let base = URL(fileURLWithPath: dir, isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        let model = Model()
+        func mini<V: View>(_ v: V) -> some View {
+            v.padding(14)
+                .frame(width: 380)
+                .background(Color(white: 0.17))
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .environment(\.colorScheme, .dark)
+                .environment(\.blobClock, 1003.4)
+        }
+        if var p = model.presentation {
+            for provider in Provider.allCases {
+                p.blobs = model.presentation!.blobs.filter { $0.provider == provider }
+                p.limits = model.presentation!.limits.filter { $0.provider == provider }
+                let card = SmartLayout(p: p, activities: model.activities, busy: model.busy,
+                                       onBoost: { _, _ in }, onAutoReserve: { _, _ in })
+                write(mini(card), scale: 2, to: base.appendingPathComponent("card-\(provider.rawValue).png"))
+            }
+        }
+        if !HoldsModel.shared.pending.isEmpty {
+            write(mini(HoldQueueCard(holds: HoldsModel.shared, model: model, snapshot: true)), scale: 2,
+                  to: base.appendingPathComponent("hold.png"))
+        }
+        write(mini(MasterSwitchCard(on: true) { _ in }), scale: 2, to: base.appendingPathComponent("switch.png"))
+        exit(0)
+    }
+
     @MainActor
     static func write<V: View>(_ view: V, scale: CGFloat, to url: URL) {
         let r = ImageRenderer(content: view)

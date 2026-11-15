@@ -313,6 +313,9 @@ struct SlowburnApp: App {
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
             Self.snapshot(to: args[i + 1])
         }
+        if let i = args.firstIndex(of: "--export-ui"), i + 1 < args.count {
+            IconExport.ui(to: args[i + 1])
+        }
         if let i = args.firstIndex(of: "--export-clip"), i + 2 < args.count {
             IconExport.clip(to: args[i + 1], what: args[i + 2], seconds: i + 3 < args.count ? Double(args[i + 3]) ?? 4 : 4)
         }
