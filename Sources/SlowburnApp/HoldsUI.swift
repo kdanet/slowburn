@@ -92,75 +92,79 @@ final class HoldsModel: ObservableObject {
 struct HoldQueueCard: View {
     @ObservedObject var holds: HoldsModel
     @ObservedObject var model: Model
-    /// Rendering for a snapshot or a clip, where AppKit controls can't be drawn.
+    /// Rendering for a snapshot or a clip. The card draws its own buttons, so nothing changes; kept for callers.
     var snapshot = false
 
-    private func fakeButton(_ title: String, prominent: Bool = false) -> some View {
-        Text(title)
-            .font(.system(size: 11.5, weight: .medium))
-            .foregroundStyle(prominent ? Color.white : Color.primary)
-            .padding(.horizontal, 9).padding(.vertical, 3)
-            .background(RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(prominent ? Color.accentColor : Color.primary.opacity(0.14)))
-    }
+    private static let pillHeight: CGFloat = 32
 
     var body: some View {
         let count = holds.sessionsWaiting
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "pause.circle.fill").font(.system(size: 18)).foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(L("\(count) \(agentsWord(count)) решения", "\(count) \(agentsWord(count)) for a decision"))
-                        .font(.system(size: 13, weight: .semibold))
-                    if let reason = holds.pending.first?.reason {
-                        Text(reason).font(.system(size: 10.5)).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+        let first = holds.pending.first
+        let provider = first?.provider ?? .claude
+        let tint = provider.tint
+        // When the 5-hour window frees up again, from the same numbers the bars show.
+        let freeAt = model.presentation?.limits.first { $0.provider == provider && $0.fiveHourBudget != nil }?.fiveHourFreesAt
+        let who = count == 1 ? Phrases.providerName(provider) : "\(count)"
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    Circle().fill(Color.orange.opacity(0.2))
+                    Image(systemName: "pause.fill").font(.system(size: 13, weight: .bold)).foregroundStyle(.orange)
                 }
+                .frame(width: 34, height: 34)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(count == 1 ? L("\(who) ждёт тебя", "\(who) is waiting for you")
+                                    : L("\(who) \(agentsWord(count)) тебя", "\(who) agents are waiting for you"))
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(freeAt.map { L("Пауза, чтобы сберечь лимит · свободно в \(Phrases.time($0))",
+                                        "Paused to save your limit · free again at \(Phrases.time($0))") }
+                         ?? L("Пауза, чтобы сберечь лимит", "Paused to save your limit"))
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .lineLimit(1).minimumScaleFactor(0.85)
+                }
+                Spacer(minLength: 0)
             }
+            .help(first?.reason ?? "")
+            // Which sessions wait, and for how long — one quiet line each.
             VStack(spacing: 4) {
                 ForEach(holds.byProject, id: \.project) { g in
-                    HStack(spacing: 6) {
-                        Circle().fill(g.provider.tint).frame(width: 6, height: 6)
-                        Text(g.project).font(.system(size: 11.5))
-                        if g.count > 1 { Text("×\(g.count)").font(.system(size: 11)).foregroundStyle(.secondary) }
+                    HStack(spacing: 7) {
+                        Circle().fill(g.provider.tint).frame(width: 7, height: 7)
+                        Text(g.project).font(.system(size: 12.5, weight: .medium))
+                        if g.count > 1 { Text("×\(g.count)").font(.system(size: 12)).foregroundStyle(.secondary) }
                         Spacer()
-                        Text(L("ждёт \(Phrases.duration(Date().timeIntervalSince(g.since)))", "waiting \(Phrases.duration(Date().timeIntervalSince(g.since)))"))
-                            .font(.system(size: 10.5)).foregroundStyle(.tertiary).monospacedDigit()
+                        Text(Phrases.duration(Date().timeIntervalSince(g.since)))
+                            .font(.system(size: 12)).foregroundStyle(.tertiary).monospacedDigit()
                     }
                 }
             }
-            if snapshot {
-                // Snapshots can't draw AppKit buttons: drawn stand-ins in the same places.
-                HStack(spacing: 6) {
-                    fakeButton(L("Продолжить всех", "Continue all"), prominent: true)
-                    fakeButton(L("+ 30 мин без тормоза", "+ 30 min, no brake"))
-                    Spacer(minLength: 0)
-                    fakeButton(L("Стоп", "Stop"))
-                }
-            } else {
-                HStack(spacing: 6) {
-                    Button(L("Продолжить всех", "Continue all")) { holds.releaseAll() }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    Button(L("+ 30 мин без тормоза", "+ 30 min, no brake")) { holds.releaseAndPause(model: model) }
-                        .controlSize(.small)
-                    Spacer(minLength: 0)
-                    Button(L("Стоп", "Stop")) { holds.stopAll() }
-                        .controlSize(.small)
-                        .help(L("Агенты аккуратно завершат ход и опишут, где остановились", "Agents wrap up their turn cleanly and describe where they stopped"))
-                }
+            .padding(.horizontal, 2)
+            HStack(spacing: 8) {
+                pill(L("Продолжить", "Continue"), fill: tint, text: Color.black.opacity(0.82)) { holds.releaseAll() }
+                    .help(L("Агенты продолжат работу", "Agents go on with their work"))
+                pill(L("+30 мин", "+30 min"), fill: tint.opacity(0.18), text: tint) { holds.releaseAndPause(model: model) }
+                    .help(L("Продолжить и снять тормоз на 30 минут", "Continue and take the brake off for 30 minutes"))
+                pill(L("Стоп", "Stop"), fill: Color.primary.opacity(0.09), text: .primary) { holds.stopAll() }
+                    .help(L("Агенты аккуратно завершат ход и опишут, где остановились", "Agents wrap up their turn cleanly and describe where they stopped"))
             }
-            Text(holds.settings.releaseMode == .manual
-                 ? L("Сами не продолжат: только по твоей кнопке. Через \(Int(holds.settings.maxWait / 60)) мин без решения — остановятся.",
-                     "They won't continue on their own, only on your click. After \(Int(holds.settings.maxWait / 60)) min with no decision they stop.")
-                 : L("Продолжат сами, когда вернётся бюджет, или по твоей кнопке.",
-                     "They continue on their own when the budget returns, or on your click."))
-                .font(.system(size: 10.5)).foregroundStyle(.tertiary)
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.orange.opacity(0.12)))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.orange.opacity(0.35), lineWidth: 0.5))
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.orange.opacity(0.10)))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.orange.opacity(0.28), lineWidth: 0.5))
+    }
+
+    /// A capsule button in the panel's own style: the same height and shape as the bars.
+    private func pill(_ title: String, fill: Color, text: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13.5, weight: .semibold))
+                .foregroundStyle(text)
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.pillHeight)
+                .background(Capsule().fill(fill))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     /// "1 агент ждёт", "3 агента ждут", "7 агентов ждут", "21 агент ждёт".
