@@ -59,6 +59,16 @@ public struct Snapshot: Codable, Sendable, Equatable {
     public var windowStart: Date { resetsAt.addingTimeInterval(-Double(windowMinutes) * 60) }
     /// Weekly-ish windows get a pacing plan; short ones (Codex 5h) only a burn forecast.
     public var isLongWindow: Bool { windowMinutes >= 24 * 60 }
+
+    public static let slotLength: TimeInterval = 5 * 3600
+
+    /// The window cut into fixed 5-hour slots from its start; the slot `at` falls in. The last one ends at the
+    /// reset, so it is shorter (a week is 33 slots and 3 hours).
+    public func fiveHourSlot(at: Date) -> DateInterval {
+        let k = Swift.max(0, (at.timeIntervalSince(windowStart) / Self.slotLength).rounded(.down))
+        let start = windowStart.addingTimeInterval(k * Self.slotLength)
+        return DateInterval(start: start, end: Swift.max(start, Swift.min(start.addingTimeInterval(Self.slotLength), resetsAt)))
+    }
 }
 
 public enum Freshness: String, Codable, Sendable {

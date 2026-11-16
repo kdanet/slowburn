@@ -83,11 +83,11 @@ private func state(_ pools: [PoolStatus], now: Date, credits: CreditsStatus? = n
     pool.fiveHourBudget = 3
     pool.battery = 2
     pool.fiveHourCap = Pacer.fiveHourCap(norm: 3, battery: 2, boost: 2) // 3 + 2 added by hand
-    pool.spentLast5h = 4.5 // within norm 3 + reserve 2
+    pool.spentThisSlot = 4.5 // within norm 3 + reserve 2
     #expect(Brake.holdReason(state: state([pool], now: now), provider: .claude, now: now) == nil)
-    pool.spentLast5h = 6.5 // beyond 3 + 2 (+1 tolerance)
+    pool.spentThisSlot = 6.5 // beyond 3 + 2 (+1 tolerance)
     let r = Brake.holdReason(state: state([pool], now: now), provider: .claude, now: now)
-    #expect(r?.contains("за последние 5 часов") == true)
+    #expect(r?.contains("в этих 5 часах") == true)
 }
 
 @Test func overrideAndStaleStateNeverHold() {
@@ -111,20 +111,19 @@ private func state(_ pools: [PoolStatus], now: Date, credits: CreditsStatus? = n
     #expect(Brake.holdReason(state: state([full], now: now), provider: .codex, now: now) == nil)
 }
 
-@Test func boostsStackTakeBackAndExpire() {
+@Test func boostsStackTakeBackAndEndWithTheirSlot() {
     let paths = tempPaths()
     defer { try? FileManager.default.removeItem(at: paths.support) }
     let now = Date()
+    let slotStart = now.addingTimeInterval(-600)
+    Boosts.add(.codex, amount: 1, paths: paths, now: now.addingTimeInterval(-900)) // pressed in the previous slot
     Boosts.add(.codex, amount: 2.9, paths: paths, now: now)
     Boosts.add(.codex, amount: 2.9, paths: paths, now: now.addingTimeInterval(60))
     Boosts.add(.claude, amount: 1, paths: paths, now: now)
-    #expect(abs(Boosts.total(.codex, paths: paths, now: now.addingTimeInterval(120)) - 5.8) < 1e-9)
+    #expect(abs(Boosts.total(.codex, paths: paths, since: slotStart) - 5.8) < 1e-9)
     Boosts.removeLast(.codex, paths: paths, now: now.addingTimeInterval(120))
-    #expect(abs(Boosts.total(.codex, paths: paths, now: now.addingTimeInterval(120)) - 2.9) < 1e-9)
-    #expect(Boosts.total(.claude, paths: paths, now: now) == 1)
-    // Five hours later the limit is back to the norm on its own.
-    #expect(Boosts.total(.codex, paths: paths, now: now.addingTimeInterval(Boosts.lifetime + 1)) == 0)
-    // Dates go through JSON as seconds, so compare with a small tolerance.
-    let until = Boosts.until(.codex, paths: paths, now: now)
-    #expect(abs((until ?? .distantPast).timeIntervalSince(now.addingTimeInterval(Boosts.lifetime))) < 0.01)
+    #expect(abs(Boosts.total(.codex, paths: paths, since: slotStart) - 2.9) < 1e-9)
+    #expect(Boosts.total(.claude, paths: paths, since: slotStart) == 1)
+    // The next slot starts from the norm again.
+    #expect(Boosts.total(.codex, paths: paths, since: now.addingTimeInterval(3600)) == 0)
 }

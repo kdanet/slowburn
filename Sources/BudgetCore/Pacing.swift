@@ -6,7 +6,7 @@ public struct PaceSettings: Codable, Sendable, Equatable {
     public var margin: Double = 2
     /// Start-of-plan advance, in hours of normal earning. Part of the weekly total, not on top of it.
     public var advanceHours: Double = 5
-    /// How many extra 5h-budgets the battery may release per rolling 5 hours.
+    /// How many extra 5h-budgets the battery may release per 5-hour slot.
     public var batteryDischargeFactor: Double = 1
     /// Readings older than this are stale: the soft brake stops blocking on them.
     public var staleAfter: TimeInterval = 15 * 60
@@ -88,23 +88,25 @@ public struct PoolStatus: Codable, Sendable, Equatable {
     public var normal: Double?
     public var battery: Double?
     public var batteryHours: Double?
+    /// The current 5-hour slot's norm and what has been spent in it so far.
     public var fiveHourBudget: Double?
-    public var spentLast5h: Double?
-    /// How much the last 5 hours may take: the norm plus a slice of the savings (see `Pacer.fiveHourCap`).
+    public var spentThisSlot: Double?
+    /// How much the current 5-hour slot may take: the norm plus what you added from savings (see `Pacer.fiveHourCap`).
     public var fiveHourCap: Double?
-    /// The part of `fiveHourCap` above the norm that you added by hand.
+    /// The part of `fiveHourCap` above the norm, added from the reserve ("+" or the reserve's checkbox).
     public var fiveHourBoost: Double?
     /// Percent per unit of the local spend curve (see `SpendCurve.rate`), kept for the next week's first hours.
     public var spendRate: Double?
-    /// When the hand-added part runs out and the limit is back to the norm.
+    /// When the added part runs out: the end of the slot, when the next one starts from the norm.
     public var boostUntil: Date?
     /// The reserve feeds the 5-hour limit on its own, all of it (the reserve's checkbox).
     public var fiveHourAuto: Bool?
-    /// The 5-hour limit is rolling, so it has no single reset. With no more spending:
-    /// when the last 5 hours are back within the limit (nil = they already are),
+    /// Over the limit: when it opens again — the next slot, with a fresh norm (nil = not over).
     public var fiveHourFreesAt: Date?
-    /// and when everything spent in them has rolled off (nil = nothing spent).
-    public var fiveHourClearsAt: Date?
+    /// When the current 5-hour slot ends and the next one starts from zero.
+    public var fiveHourResetsAt: Date?
+    /// Ahead of plan (`available` < 0): the start of the first slot whose norm brings it back above zero.
+    public var planBackAt: Date?
 
     // Forecast, any window.
     public var burnPerHour: Double?
@@ -134,37 +136,6 @@ public enum Pacer {
         norm + Swift.min(Swift.max(0, battery), Swift.max(0, boost))
     }
 
-    /// With no more spending, the first moment the trailing 5 hours take no more than `limit`: each reading
-    /// rolls off 5 hours after it was taken. Nothing before `t0` (the plan start) is charged.
-    /// nil when that is already true.
-    public static func rollingRelease(history: [UsagePoint], current: Double, limit: Double, t0: Date, now: Date,
-                                      window: TimeInterval = 5 * 3600) -> Date? {
-        // spent(T) = current − (last reading at or before T − 5 h): it falls to `limit` once that reading
-        // is the first one that had already reached `current − limit`.
-        let need = current - limit
-        let sorted = history.sorted(by: { $0.at < $1.at })
-        // Already within it, counted the way `evaluate` counts (no reading that old: the earliest one).
-        let since = Swift.max(now.addingTimeInterval(-window), t0)
-        let base = sorted.last(where: { $0.at <= since })?.used ?? sorted.first?.used ?? current
-        guard need > 1e-9, base < need - 1e-9,
-              let first = sorted.first(where: { $0.used >= need - 1e-9 }) else { return nil }
-        let at = first.at.addingTimeInterval(window)
-        return at > now ? at : nil
-    }
-
-    /// With no more spending, the first moment `spentBy(T)` — what the 5 hours ending at T hold — is within `limit`.
-    /// nil when it already is. `spentBy` only falls as T moves on, so halving finds the moment to the second.
-    static func modelRelease(_ spentBy: (Date) -> Double, limit: Double, now: Date,
-                             window: TimeInterval = 5 * 3600) -> Date? {
-        guard spentBy(now) > limit + 1e-9 else { return nil }
-        var lo = 0.0, hi = window
-        while hi - lo > 1 {
-            let mid = (lo + hi) / 2
-            if spentBy(now.addingTimeInterval(mid)) > limit + 1e-9 { lo = mid } else { hi = mid }
-        }
-        return now.addingTimeInterval(hi)
-    }
-
     /// One press of "+": one more norm, or what is left of the savings if that is less.
     public static func boostStep(norm: Double, battery: Double, boost: Double) -> Double {
         Swift.max(0, Swift.min(norm, Swift.max(0, battery) - Swift.max(0, boost)))
@@ -190,7 +161,7 @@ public enum Pacer {
 
     public static func evaluate(snapshot s: Snapshot, plan: PacePlan?, history: [UsagePoint],
                                 settings: PaceSettings, now: Date, fiveHourBoost: Double = 0,
-                                boostUntil: Date? = nil, curve: SpendCurve? = nil,
+                                curve: SpendCurve? = nil,
                                 curveRate: Double? = nil) -> PoolStatus {
         let current = UsagePoint(at: Swift.max(s.observedAt, history.map(\.at).max() ?? s.observedAt), used: s.usedPercent)
         let freshness = Freshness.of(s.observedAt, now: now, staleAfter: settings.staleAfter)
@@ -214,58 +185,55 @@ public enum Pacer {
         }
 
         if s.isLongWindow, let plan {
-            let earned = plan.earned(at: now)
-            let consumed = Swift.max(0, s.usedPercent - plan.u0)
-            let available = earned - consumed
-            let b5 = plan.fiveHourBudget
+            // The week is cut into fixed 5-hour slots. Each slot's norm is the plan's earning over it, handed
+            // out whole when the slot starts; whatever a slot leaves unspent stays in the reserve.
+            let slot = s.fiveHourSlot(at: now)
             // The plan's ledger starts at t0: spending before we started watching is not charged to it.
-            let since = Swift.max(now.addingTimeInterval(-5 * 3600), plan.t0)
-            var spent5h = since == plan.t0 ? consumed
+            let since = Swift.max(slot.start, plan.t0)
+            let norm = Swift.max(0, plan.earned(at: slot.end) - plan.earned(at: since))
+            let consumed = Swift.max(0, s.usedPercent - plan.u0)
+            var spentSlot = since == plan.t0 ? consumed
                 : spent(history: history, current: s.usedPercent, since: since,
                         // No reading that old: count from the earliest one we have, never from the plan start.
                         fallback: history.min(by: { $0.at < $1.at })?.used ?? s.usedPercent)
-            // Readings in whole percent move the 5-hour figure in jumps of a third of its norm. Where a finer
-            // local measure covers the 5 hours, it says how much went in between — kept within a step of
+            // Readings in whole percent move the slot's figure in jumps of a third of its norm. Where a finer
+            // local measure covers the slot, it says how much went in between — kept within a step of
             // what the readings say, since it can miss spending elsewhere (claude.ai, another Mac).
-            var model: ((Date) -> Double)?
             // Early in a week there are too few ticks to measure the rate: the last week's (`curveRate`) stands in.
             let rate = curve?.rate(history: history + [current]) ?? curveRate
             status.spendRate = rate
             if let curve, let rate, let covered = curve.coveredFrom, covered <= since {
                 let raw = rate * curve.amount(from: since, to: now)
-                let refined = raw.clamped(Swift.max(0, spent5h - s.precision), spent5h + s.precision)
-                if raw > 0 {
-                    let scale = refined / raw
-                    model = { at in
-                        scale * rate * curve.amount(from: Swift.max(at.addingTimeInterval(-5 * 3600), plan.t0), to: now)
-                    }
-                }
-                spent5h = refined
+                spentSlot = raw.clamped(Swift.max(0, spentSlot - s.precision), spentSlot + s.precision)
             }
+            // A = what the plan has handed out through this slot, less what is spent.
+            let earned = plan.earned(at: slot.end)
+            let available = earned - consumed
+            // The reserve as the slot began: everything earlier slots left unspent (negative = debt).
+            let reserve = available - norm + spentSlot
             status.plan = plan
             status.earned = earned
             status.consumed = consumed
             status.available = available
-            status.normal = available.clamped(0, b5)
-            status.battery = Swift.max(0, available - b5)
+            status.normal = Swift.max(0, Swift.min(norm - spentSlot, available))
+            status.battery = Swift.max(0, available - (status.normal ?? 0))
             status.batteryHours = plan.ratePerHour > 0 ? (status.battery ?? 0) / plan.ratePerHour : nil
-            status.fiveHourBudget = b5
-            status.spentLast5h = spent5h
-            let cap = Pacer.fiveHourCap(norm: b5, battery: status.battery ?? 0, boost: fiveHourBoost)
-            status.fiveHourBoost = Swift.min(Swift.max(0, status.battery ?? 0), Swift.max(0, fiveHourBoost))
+            status.fiveHourBudget = norm
+            status.spentThisSlot = spentSlot
+            let cap = Pacer.fiveHourCap(norm: norm, battery: reserve, boost: fiveHourBoost)
+            status.fiveHourBoost = cap - norm
             status.fiveHourCap = cap
-            status.boostUntil = boostUntil
-            if spent5h > 0 {
-                let points = history + [current]
-                func release(_ limit: Double) -> Date? {
-                    if let model { return modelRelease(model, limit: limit, now: now) }
-                    return rollingRelease(history: points, current: s.usedPercent, limit: limit, t0: plan.t0, now: now)
+            if cap - norm > 0 { status.boostUntil = slot.end }
+            status.fiveHourResetsAt = slot.end
+            if spentSlot > cap { status.fiveHourFreesAt = slot.end }
+            if available < 0 {
+                // Each later slot hands out its norm when it starts: the first one that covers the debt.
+                var start = slot.end
+                while start < s.resetsAt {
+                    let next = s.fiveHourSlot(at: start)
+                    if plan.earned(at: next.end) - consumed >= 0.5 { status.planBackAt = start; break }
+                    start = next.end
                 }
-                var frees = spent5h > cap ? release(cap) : nil
-                // The hand-added part ends first: from then on only the norm counts.
-                if let f = frees, let until = boostUntil, f > until, cap > b5 { frees = Swift.max(release(b5) ?? until, until) }
-                status.fiveHourFreesAt = frees
-                status.fiveHourClearsAt = release(0)
             }
             status.correctionDetected = s.usedPercent < plan.u0 - s.precision
 
@@ -275,9 +243,9 @@ public enum Pacer {
             } else if available <= 0 {
                 level = .red; status.reasons.append("earned_exhausted")
             } else {
-                if spent5h > cap {
+                if spentSlot > cap {
                     level = .yellow; status.reasons.append("battery_discharge_cap")
-                } else if spent5h > b5 {
+                } else if spentSlot > norm {
                     // Spending saved-up battery is what it is for: worth a note, not a worry.
                     status.reasons.append("using_battery")
                 }

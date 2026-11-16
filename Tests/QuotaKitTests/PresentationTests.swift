@@ -31,11 +31,12 @@ private func state(_ pools: [PoolStatus], credits: CreditsStatus? = nil) -> AppS
 }
 
 @Test func calmBlobShowsHoursOfEarnedPlan() throws {
-    // 10 hours into a plan, nothing spent: 10 hours of charge.
+    // 10 hours into a plan, nothing spent, 3 hours left in the current 5-hour slot (the week opened 72 h ago,
+    // slots start every 5 h from then): the slot's norm is handed out whole, so 13 hours of charge.
     let p = Presentation.make(state([weekly(.claude, used: 40, u0: 40, hoursIntoPlan: 10)]), now: now)
     let claude = try #require(p.blob(.claude))
     #expect(claude.mood == .charged)
-    #expect(claude.hoursText == "10 ч")
+    #expect(claude.hoursText == "13 ч")
     #expect(claude.level == 1)
 }
 

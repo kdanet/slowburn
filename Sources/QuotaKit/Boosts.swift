@@ -1,8 +1,8 @@
 import BudgetCore
 import Foundation
 
-/// "+" on the 5-hour bar: savings you chose to add to the 5-hour limit. Each press is a grant that lives
-/// 5 hours, then the limit goes back to the norm on its own — a click is never a permanent change.
+/// "+" on the 5-hour bar: savings you chose to add to the current 5-hour slot. A grant counts only in the slot
+/// it was pressed in; the next slot starts from the norm again — a click is never a permanent change.
 public struct BoostGrant: Codable, Sendable, Equatable {
     public var provider: Provider
     public var amount: Double
@@ -16,7 +16,8 @@ public struct BoostGrant: Codable, Sendable, Equatable {
 }
 
 public enum Boosts {
-    public static let lifetime: TimeInterval = 5 * 3600
+    /// No slot is longer: older grants are dropped from the file.
+    public static let lifetime: TimeInterval = Snapshot.slotLength
 
     static func url(_ paths: Paths) -> URL { paths.support.appendingPathComponent("boosts.json") }
 
@@ -24,17 +25,13 @@ public enum Boosts {
         JSONFile.load([BoostGrant].self, from: url(paths)) ?? []
     }
 
-    public static func active(_ p: Provider, paths: Paths, now: Date) -> [BoostGrant] {
-        all(paths: paths).filter { $0.provider == p && now.timeIntervalSince($0.at) < lifetime }
+    /// Grants pressed in the slot that started at `since`.
+    public static func active(_ p: Provider, paths: Paths, since: Date) -> [BoostGrant] {
+        all(paths: paths).filter { $0.provider == p && $0.at >= since }
     }
 
-    public static func total(_ p: Provider, paths: Paths, now: Date) -> Double {
-        active(p, paths: paths, now: now).reduce(0) { $0 + $1.amount }
-    }
-
-    /// When the last active grant runs out.
-    public static func until(_ p: Provider, paths: Paths, now: Date) -> Date? {
-        active(p, paths: paths, now: now).map { $0.at.addingTimeInterval(lifetime) }.max()
+    public static func total(_ p: Provider, paths: Paths, since: Date) -> Double {
+        active(p, paths: paths, since: since).reduce(0) { $0 + $1.amount }
     }
 
     public static func add(_ p: Provider, amount: Double, paths: Paths, now: Date) {
@@ -53,7 +50,7 @@ public enum Boosts {
 }
 
 /// The reserve's checkbox: when on, the 5-hour limit takes from the reserve on its own, as much as it holds —
-/// no "+" presses, no 5-hour expiry. Per provider; stays on until unchecked.
+/// no "+" presses, in every slot. Per provider; stays on until unchecked.
 public enum AutoReserve {
     static func url(_ paths: Paths) -> URL { paths.support.appendingPathComponent("auto-reserve.json") }
 

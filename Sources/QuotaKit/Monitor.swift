@@ -165,16 +165,16 @@ public final class Monitor: @unchecked Sendable {
             }
             var poolSettings = settings
             if s.source == .codexRollout { poolSettings.staleAfter = codexStaleAfter }
-            // With the reserve's checkbox on, the whole reserve backs the 5-hour limit, with no expiry.
+            // With the reserve's checkbox on, the whole reserve backs the 5-hour limit in every slot.
             let auto = AutoReserve.isOn(s.pool.provider, paths: paths)
+            let slot = s.fiveHourSlot(at: now)
             var status = Pacer.evaluate(snapshot: s, plan: plan, history: history.points[key] ?? [],
                                         settings: poolSettings, now: now,
-                                        fiveHourBoost: auto ? .greatestFiniteMagnitude : Boosts.total(s.pool.provider, paths: paths, now: now),
-                                        boostUntil: auto ? nil : Boosts.until(s.pool.provider, paths: paths, now: now),
+                                        fiveHourBoost: auto ? .greatestFiniteMagnitude : Boosts.total(s.pool.provider, paths: paths, since: slot.start),
                                         curve: tokens.curve(for: s.pool, now: now)
                                             ?? codexTokens.curve(for: s.pool, isLongWindow: s.isLongWindow, now: now),
                                         curveRate: lastRates[key])
-            if auto { status.fiveHourAuto = true }
+            if auto { status.fiveHourAuto = true; status.boostUntil = nil }
             if s.isLongWindow, now < s.resetsAt {
                 status.smart = Smart.compute(snapshot: s, plan: plan, history: history.points[key] ?? [], now: now)
             }

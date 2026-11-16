@@ -85,15 +85,15 @@ public enum Phrases {
             return L("\(name): лимит исчерпан, сброс в \(time(s.snapshot.resetsAt)).",
                      "\(name): limit reached, resets at \(time(s.snapshot.resetsAt)).")
         }
-        if s.reasons.contains("earned_exhausted"), let plan = s.plan, let available = s.available {
-            // Back to a small positive balance (half a point) at the plan's fixed rate.
-            let wait = (-available + 0.5) / max(plan.ratePerHour, 0.0001) * 3600
-            return L("\(name): ты впереди плана на \(points(-available)) п. Запас появится к \(time(now.addingTimeInterval(wait))).",
-                     "\(name): you're \(points(-available)) pts ahead of plan. Headroom returns by \(time(now.addingTimeInterval(wait))).")
+        if s.reasons.contains("earned_exhausted"), let available = s.available {
+            // Back once a later slot's norm covers the debt (half a point to spare).
+            let back = s.planBackAt ?? s.snapshot.resetsAt
+            return L("\(name): ты впереди плана на \(points(-available)) п. Запас появится к \(time(back)).",
+                     "\(name): you're \(points(-available)) pts ahead of plan. Headroom returns by \(time(back)).")
         }
         if s.reasons.contains("battery_discharge_cap") {
-            return L("\(name): за 5 часов потрачено \(points(s.spentLast5h ?? 0)) п. — больше двойной нормы. Батарейка: \(points(s.battery ?? 0)) п.",
-                     "\(name): \(points(s.spentLast5h ?? 0)) pts spent in 5 hours — over twice the norm. Battery: \(points(s.battery ?? 0)) pts.")
+            return L("\(name): в этих 5 часах потрачено \(points(s.spentThisSlot ?? 0)) п. — больше нормы с добавкой. Батарейка: \(points(s.battery ?? 0)) п.",
+                     "\(name): \(points(s.spentThisSlot ?? 0)) pts spent in these 5 hours — over the norm with its top-up. Battery: \(points(s.battery ?? 0)) pts.")
         }
         if s.reasons.contains("using_battery") {
             return L("\(name): тратишь накопленное, в батарейке \(points(s.battery ?? 0)) п. (~\(duration((s.batteryHours ?? 0) * 3600)) обычного темпа).",

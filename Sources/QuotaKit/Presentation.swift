@@ -83,22 +83,28 @@ public struct LimitRow: Sendable, Identifiable {
     public var ratePerHour: Double?
     /// Today, will-it-last and hours of work (long windows).
     public var smart: SmartStats?
-    /// Our rolling 5-hour norm (the plan's 5 hours of earning) and what the last 5 hours actually took.
+    /// Our 5-hour norm (the plan's earning over the current fixed slot) and what the slot has taken so far.
     public var fiveHourBudget: Double?
-    public var spentLast5h: Double?
+    public var spentThisSlot: Double?
     /// The norm plus what you added from savings with "+".
     public var fiveHourCap: Double?
     public var fiveHourBoost: Double?
     public var boostUntil: Date?
-    /// Rolling 5 hours, with no more spending: back within the limit / fully rolled off.
+    /// Over the limit: when the next slot opens it again / when the current slot ends.
     public var fiveHourFreesAt: Date? = nil
-    public var fiveHourClearsAt: Date? = nil
+    public var fiveHourResetsAt: Date? = nil
     /// The reserve backs the 5-hour limit automatically (its checkbox is on).
     public var fiveHourAuto: Bool = false
 
     /// The provider's own ceiling: what is left before it blocks.
     public var providerLeft: Double { max(0, 100 - used) }
     public var availableHours: Double? { hours(available.map { max(0, $0) }) }
+    /// What one more "+" would add: one norm, or what is left of the reserve the slot started with.
+    public var boostStep: Double {
+        guard let norm = fiveHourBudget, norm > 0 else { return 0 }
+        let reserve = max(battery ?? 0, 0) + max(0, (spentThisSlot ?? 0) - norm)
+        return Pacer.boostStep(norm: norm, battery: reserve, boost: max(0, (fiveHourCap ?? norm) - norm))
+    }
     public var batteryHours: Double? { hours(battery) }
 
     private func hours(_ points: Double?) -> Double? {
@@ -187,11 +193,10 @@ extension Presentation {
         let hoursText = hours.map(Phrases.hours) ?? "—"
         let worst = fresh.map(\.level).max() ?? .unknown
 
-        // When it gets better: a full window resets, an overspent plan earns back half a point.
+        // When it gets better: a full window resets, an overspent plan gets a slot whose norm covers the debt.
         let backAt: Date? = fresh.filter { $0.level == .red }.compactMap { s -> Date? in
             if s.reasons.contains("limit_reached") { return s.snapshot.resetsAt }
-            guard let a = s.available, let plan = s.plan else { return nil }
-            return now.addingTimeInterval((-a + 0.5) / max(plan.ratePerHour, 0.0001) * 3600)
+            return s.planBackAt ?? s.snapshot.resetsAt
         }.max()
 
         let paying = p == .codex && !fullShort.isEmpty && (state.codexCredits?.spentLastHour ?? 0) > 0
@@ -250,9 +255,9 @@ extension Presentation {
                                 windowName: title, resetsAt: s.resetsAt,
                                 available: p.available, normal: p.normal, battery: p.battery,
                                 margin: p.plan?.margin, ratePerHour: p.plan?.ratePerHour, smart: p.smart,
-                                fiveHourBudget: p.fiveHourBudget, spentLast5h: p.spentLast5h, fiveHourCap: p.fiveHourCap,
+                                fiveHourBudget: p.fiveHourBudget, spentThisSlot: p.spentThisSlot, fiveHourCap: p.fiveHourCap,
                                 fiveHourBoost: p.fiveHourBoost, boostUntil: p.boostUntil,
-                                fiveHourFreesAt: p.fiveHourFreesAt, fiveHourClearsAt: p.fiveHourClearsAt,
+                                fiveHourFreesAt: p.fiveHourFreesAt, fiveHourResetsAt: p.fiveHourResetsAt,
                                 fiveHourAuto: p.fiveHourAuto ?? false)
             }
     }

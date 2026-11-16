@@ -72,7 +72,9 @@ func render(_ state: AppState) -> String {
                              "     plan: \(Phrases.points(plan.ratePerHour * 24)) pts/day, 5h norm \(Phrases.points(b5)) pts"))
                 out.append(L("     запас \(Phrases.points(a)) п. = обычный \(Phrases.points(p.normal ?? 0)) + батарейка \(Phrases.points(p.battery ?? 0)) (~\(Phrases.duration((p.batteryHours ?? 0) * 3600)))",
                              "     headroom \(Phrases.points(a)) pts = regular \(Phrases.points(p.normal ?? 0)) + battery \(Phrases.points(p.battery ?? 0)) (~\(Phrases.duration((p.batteryHours ?? 0) * 3600)))"))
-                out.append(L("     за 5 часов: \(Phrases.points(p.spentLast5h ?? 0)) п.", "     last 5 hours: \(Phrases.points(p.spentLast5h ?? 0)) pts"))
+                let slotEnd = p.fiveHourResetsAt.map { L(", новые с \(Phrases.time($0))", ", next from \(Phrases.time($0))") } ?? ""
+                out.append(L("     в этих 5 часах: \(Phrases.points(p.spentThisSlot ?? 0)) из \(Phrases.points(b5)) п.\(slotEnd)",
+                             "     these 5 hours: \(Phrases.points(p.spentThisSlot ?? 0)) of \(Phrases.points(b5)) pts\(slotEnd)"))
             }
             if let burn = p.burnPerHour {
                 var f = L("     темп \(Phrases.points(burn)) п./ч", "     pace \(Phrases.points(burn)) pts/h")

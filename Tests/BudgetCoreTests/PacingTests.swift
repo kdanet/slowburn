@@ -41,11 +41,12 @@ private func noAdvance() -> PaceSettings {
     let plan = PacePlan.start(from: weekly(used: 0, at: t0), now: t0, settings: settings)
     let s = Pacer.evaluate(snapshot: weekly(used: 0, at: hours(24)), plan: plan,
                            history: [UsagePoint(at: t0, used: 0)], settings: settings, now: hours(24))
+    // 24 h is inside the 20–25 h slot: its whole norm is handed out, the four slots before are the reserve.
     let a = try! #require(s.available)
-    #expect(abs(a - 100.0 / 7) < 1e-9)
+    #expect(abs(a - 100.0 / 168 * 25) < 1e-9)
     #expect(abs((s.normal ?? 0) + (s.battery ?? 0) - a) < 1e-9)
     #expect(abs((s.normal ?? 0) - 100.0 / 168 * 5) < 1e-9)
-    #expect(abs((s.batteryHours ?? 0) - 19) < 1e-9) // 24h earned − 5h normal
+    #expect(abs((s.batteryHours ?? 0) - 20) < 1e-9)
     #expect(s.level == .green)
 }
 
@@ -64,11 +65,13 @@ private func noAdvance() -> PaceSettings {
     #expect(plan.t0 == t0)
     #expect(plan.u0 == 0)
     let status = Pacer.evaluate(snapshot: s, plan: plan, history: [], settings: PaceSettings(), now: hours(80))
+    // 80 h starts the 80–85 h slot: its norm is handed out whole.
     let a = try #require(status.available)
-    #expect(abs(a - (98.0 * 80 / 168 - 43)) < 1e-9)
+    #expect(abs(a - (98.0 * 85 / 168 - 43)) < 1e-9)
     #expect(status.level == .green)
-    // Normal 5-hour share first, the rest is battery.
-    #expect(abs((status.battery ?? 0) - (a - 98.0 / 168 * 5)) < 1e-9)
+    // The slot's norm first, the rest is the reserve: what the 80 hours before left unspent.
+    #expect(abs((status.battery ?? 0) - (98.0 * 80 / 168 - 43)) < 1e-9)
+    #expect(status.fiveHourResetsAt == hours(85))
 }
 
 @Test func manualReplanForgetsTheWeekSoFar() {
@@ -166,24 +169,68 @@ private func noAdvance() -> PaceSettings {
     #expect(Pacer.boostStep(norm: 2.9, battery: 4, boost: 4) == 0)
 }
 
-@Test func rollingFiveHoursFreeUpAsOldReadingsRollOff() {
-    let now = Date(timeIntervalSince1970: 1_800_000_000)
-    func at(_ h: Double, _ used: Double) -> UsagePoint { UsagePoint(at: now.addingTimeInterval(h * 3600), used: used) }
-    let history = [at(-4, 40), at(-3, 42), at(-2, 45), at(-1, 47), at(0, 48)]
-    let t0 = now.addingTimeInterval(-10 * 3600)
-    // 8 spent over a limit of 4: back within it once the 45 % reading (2 h ago) is the base — in 3 hours.
-    let frees = Pacer.rollingRelease(history: history, current: 48, limit: 4, t0: t0, now: now)
-    #expect(frees == now.addingTimeInterval(3 * 3600))
-    // Fully rolled off 5 hours after the last increase.
-    #expect(Pacer.rollingRelease(history: history, current: 48, limit: 0, t0: t0, now: now) == now.addingTimeInterval(5 * 3600))
-    // Already within the limit: nothing to wait for.
-    #expect(Pacer.rollingRelease(history: history, current: 48, limit: 9, t0: t0, now: now) == nil)
-    // Spending before the plan started is never charged: 45 → 48 since the start, over a limit of 2
-    // until the 47 % reading (1 h ago) rolls off.
-    let lateStart = now.addingTimeInterval(-1.5 * 3600)
-    #expect(Pacer.rollingRelease(history: history, current: 48, limit: 4, t0: lateStart, now: now) == nil)
-    #expect(Pacer.rollingRelease(history: history, current: 48, limit: 2, t0: lateStart, now: now)
-            == now.addingTimeInterval(4 * 3600))
+@Test func weekIsCutIntoFixedFiveHourSlots() {
+    let s = weekly(used: 0, at: t0)
+    #expect(s.fiveHourSlot(at: hours(0)) == DateInterval(start: hours(0), end: hours(5)))
+    #expect(s.fiveHourSlot(at: hours(7.5)) == DateInterval(start: hours(5), end: hours(10)))
+    #expect(s.fiveHourSlot(at: hours(10)) == DateInterval(start: hours(10), end: hours(15)))
+    // 168 = 33·5 + 3: the last slot ends at the reset.
+    #expect(s.fiveHourSlot(at: hours(166)) == DateInterval(start: hours(165), end: hours(168)))
+}
+
+@Test func slotResetsAtItsEndAndLeavesTheRestToTheReserve() throws {
+    let settings = noAdvance()
+    let snap0 = weekly(used: 0, at: t0)
+    let plan = PacePlan.fromWindowStart(snap0, settings: settings)
+    let norm = plan.fiveHourBudget
+    // Half a norm spent in the 10–15 h slot: the reset time is the slot's end, wherever "now" is inside it.
+    let history = [UsagePoint(at: t0, used: 0), UsagePoint(at: hours(11), used: 0), UsagePoint(at: hours(12), used: norm / 2)]
+    for now in [hours(12), hours(13), hours(14.9)] {
+        let s = Pacer.evaluate(snapshot: weekly(used: norm / 2, at: now, precision: 0.01), plan: plan, history: history,
+                               settings: settings, now: now)
+        #expect(s.fiveHourResetsAt == hours(15))
+        #expect(abs((s.spentThisSlot ?? 0) - norm / 2) < 1e-9)
+        #expect(abs((s.battery ?? 0) - norm * 2) < 1e-9) // the two idle slots before
+    }
+    // The next slot starts from zero; the unspent half went to the reserve.
+    let next = Pacer.evaluate(snapshot: weekly(used: norm / 2, at: hours(15.5), precision: 0.01), plan: plan, history: history,
+                              settings: settings, now: hours(15.5))
+    #expect(next.fiveHourResetsAt == hours(20))
+    #expect(next.spentThisSlot == 0)
+    #expect(abs((next.battery ?? 0) - norm * 2.5) < 1e-9)
+    #expect(abs((next.normal ?? 0) - norm) < 1e-9)
+}
+
+@Test func overTheSlotOpensAgainWithTheNextOne() throws {
+    let settings = noAdvance()
+    let plan = PacePlan.fromWindowStart(weekly(used: 0, at: t0), settings: settings)
+    let norm = plan.fiveHourBudget
+    let history = [UsagePoint(at: t0, used: 0), UsagePoint(at: hours(20), used: 0)]
+    let s = Pacer.evaluate(snapshot: weekly(used: norm * 1.5, at: hours(21), precision: 0.01), plan: plan, history: history,
+                           settings: settings, now: hours(21))
+    #expect(s.reasons.contains("battery_discharge_cap"))
+    #expect(s.fiveHourFreesAt == hours(25))
+    // Spending past the norm comes out of the reserve: four idle slots, less half a norm.
+    #expect(abs((s.battery ?? 0) - norm * 3.5) < 1e-9)
+    // With the whole reserve behind it (the checkbox), the cap is the norm plus all four saved slots.
+    let auto = Pacer.evaluate(snapshot: weekly(used: norm * 1.5, at: hours(21), precision: 0.01), plan: plan, history: history,
+                              settings: settings, now: hours(21), fiveHourBoost: .greatestFiniteMagnitude)
+    #expect(abs((auto.fiveHourCap ?? 0) - norm * 5) < 1e-9)
+    #expect(auto.boostUntil == hours(25))
+}
+
+@Test func aheadOfPlanIsBackWhenASlotCoversTheDebt() throws {
+    let settings = noAdvance()
+    let plan = PacePlan.fromWindowStart(weekly(used: 0, at: t0), settings: settings)
+    let norm = plan.fiveHourBudget
+    // 2.6 norms spent in the first slot: the slots starting at 5 h and 10 h are not enough, the one at 15 h is.
+    let s = Pacer.evaluate(snapshot: weekly(used: norm * 2.6, at: hours(2), precision: 0.01), plan: plan,
+                           history: [UsagePoint(at: t0, used: 0)], settings: settings, now: hours(2))
+    #expect(s.reasons.contains("earned_exhausted"))
+    #expect(s.planBackAt == hours(10))
+    let deeper = Pacer.evaluate(snapshot: weekly(used: norm * 3.1, at: hours(2), precision: 0.01), plan: plan,
+                                history: [UsagePoint(at: t0, used: 0)], settings: settings, now: hours(2))
+    #expect(deeper.planBackAt == hours(15))
 }
 
 @Test func autoReserveBacksTheFiveHourLimitWithAllOfIt() {
@@ -217,30 +264,24 @@ private func steadyCurve(until h: Double) -> SpendCurve {
     let plan = PacePlan.start(from: weekly(used: 0, at: t0), now: t0, settings: settings)
     let history = [UsagePoint(at: hours(0), used: 0), UsagePoint(at: hours(10), used: 1),
                    UsagePoint(at: hours(20), used: 2), UsagePoint(at: hours(30), used: 3)]
-    // By readings alone the last 5 hours (29h–34h) spent a whole percent: the tick at 30h.
-    let now = hours(34)
+    // By readings alone the 35–40 h slot has spent nothing yet: the next tick comes at 40 h.
+    let now = hours(39)
     let plain = Pacer.evaluate(snapshot: weekly(used: 3, at: now), plan: plan, history: history,
                                settings: settings, now: now)
-    #expect(plain.spentLast5h == 1)
+    #expect(plain.spentThisSlot == 0)
     let s = Pacer.evaluate(snapshot: weekly(used: 3, at: now), plan: plan, history: history,
-                           settings: settings, now: now, curve: steadyCurve(until: 34))
-    #expect(abs((s.spentLast5h ?? 0) - 0.5) < 1e-9) // 5 hours at 0.1 an hour
-    // Over a cap of 0.3, it is free again once two of those hours have rolled off.
-    let tight = Pacer.evaluate(snapshot: weekly(used: 3, at: now), plan: plan, history: history,
-                               settings: settings, now: now, curve: steadyCurve(until: 34))
-    let frees = Pacer.modelRelease({ at in 0.1 * steadyCurve(until: 34).amount(from: at.addingTimeInterval(-5 * 3600), to: now) },
-                                   limit: 0.3, now: now)
-    #expect(abs(try #require(frees).timeIntervalSince(hours(36))) < 2)
-    #expect(tight.fiveHourClearsAt.map { abs($0.timeIntervalSince(hours(39))) < 2 } == true)
+                           settings: settings, now: now, curve: steadyCurve(until: 39))
+    #expect(abs((s.spentThisSlot ?? 0) - 0.4) < 1e-9) // 4 hours at 0.1 an hour
+    #expect(s.fiveHourResetsAt == hours(40))
 }
 
 @Test func localCurveNeverStraysMoreThanAStepFromTheReadings() {
     let settings = noAdvance()
     let plan = PacePlan.start(from: weekly(used: 0, at: t0), now: t0, settings: settings)
-    // Readings jumped by 3 in the last 5 hours (spent elsewhere) while the curve saw only 0.5.
+    // Readings jumped by 3 in this slot (spent elsewhere) while the curve saw only 0.4.
     let history = [UsagePoint(at: hours(0), used: 0), UsagePoint(at: hours(10), used: 1),
                    UsagePoint(at: hours(20), used: 2), UsagePoint(at: hours(29), used: 3), UsagePoint(at: hours(31), used: 6)]
     let s = Pacer.evaluate(snapshot: weekly(used: 6, at: hours(34)), plan: plan, history: history,
                            settings: settings, now: hours(34), curve: steadyCurve(until: 34))
-    #expect(abs((s.spentLast5h ?? 0) - 2) < 1e-9) // the 3 of the readings, less one step at most
+    #expect(abs((s.spentThisSlot ?? 0) - 2) < 1e-9) // the 3 of the readings in the 30–35 h slot, less one step at most
 }

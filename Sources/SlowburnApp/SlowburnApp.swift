@@ -98,14 +98,13 @@ final class Model: ObservableObject {
         Task { await refresh() }
     }
 
-    /// "+" adds one norm (or the last of the savings) to the 5-hour limit for 5 hours; "−" takes the last one back.
+    /// "+" adds one norm (or the last of the savings) to the current 5-hour slot; "−" takes the last one back.
     func boost(_ provider: Provider, _ step: Int) {
         let now = Date()
         if step < 0 {
             Boosts.removeLast(provider, paths: monitor.paths, now: now)
         } else if let row = presentation?.limits.first(where: { $0.provider == provider && $0.fiveHourBudget != nil }) {
-            let amount = Pacer.boostStep(norm: row.fiveHourBudget ?? 0, battery: row.battery ?? 0, boost: row.fiveHourBoost ?? 0)
-            Boosts.add(provider, amount: amount, paths: monitor.paths, now: now)
+            Boosts.add(provider, amount: row.boostStep, paths: monitor.paths, now: now)
         }
         Task { await refresh() }
     }
@@ -203,6 +202,14 @@ struct PopoverView: View {
         .fixedSize(horizontal: false, vertical: true)
         .background { if anchored { TopAnchor() } }
         .background { if anchored { RoundedWindow(radius: 16) } }
+        // Without the system shadow (see `RoundedWindow`) a hairline keeps the panel's edge visible on light backgrounds.
+        .overlay {
+            if anchored && RoundedWindow.systemShadowIgnoresShape {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.14), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     private var header: some View {
@@ -498,6 +505,12 @@ struct TopAnchor: NSViewRepresentable {
 struct RoundedWindow: NSViewRepresentable {
     var radius: CGFloat
 
+    /// From macOS 26 the panel's shadow no longer follows a clear window's content.
+    static var systemShadowIgnoresShape: Bool {
+        if #available(macOS 26, *) { return true }
+        return false
+    }
+
     final class Probe: NSView {
         var radius: CGFloat = 16
         private var observer: NSObjectProtocol?
@@ -534,6 +547,13 @@ struct RoundedWindow: NSViewRepresentable {
             }
             // Opening the panel would otherwise put keyboard focus (and its ring) on the first control, the gear.
             window.makeFirstResponder(nil)
+            if RoundedWindow.systemShadowIgnoresShape {
+                // The window server draws this panel's shadow, with its light rim, along the window's own nearly
+                // square corners whatever the content's shape: they stick out past ours as pale wedges.
+                // No system shadow; the panel draws its own edge (see `PopoverView`).
+                window.hasShadow = false
+                return
+            }
             window.invalidateShadow()
             // The shadow follows the window's shape once it has drawn: recompute after the first frames.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { window.invalidateShadow() }

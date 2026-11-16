@@ -204,18 +204,19 @@ extension Brake {
             if let n = state.codexFreeResets, n > 0 { r += L(" У тебя \(Phrases.freeResets(n)) лимитов.", " You have \(Phrases.freeResets(n)).") }
             return r
         }
-        // Our own 5-hour limit, there even when the provider has none: the norm plus up to one more norm of savings.
+        // Our own 5-hour limit, there even when the provider has none: the slot's norm plus what was added from the reserve.
         for p in pools where p.snapshot.isLongWindow {
-            guard let norm = p.fiveHourBudget, norm > 0, let spent = p.spentLast5h else { continue }
+            guard let norm = p.fiveHourBudget, norm > 0, let spent = p.spentThisSlot else { continue }
             let cap = p.fiveHourCap ?? norm
             if spent > cap + tolerance {
-                return L("\(Phrases.providerName(provider)): за последние 5 часов потрачено \(Phrases.points(spent))% недели при норме \(Phrases.points(cap))% с запасом. Норма скользящая — \(p.fiveHourFreesAt.map { "снова можно в \(Phrases.time($0))" } ?? "через час-другой снова можно").",
-                         "\(Phrases.providerName(provider)): \(Phrases.points(spent))% of the week spent in the last 5 hours, over the \(Phrases.points(cap))% norm with reserve. The norm is rolling — \(p.fiveHourFreesAt.map { "you can go again at \(Phrases.time($0))" } ?? "you can go again in an hour or two").")
+                let next = p.fiveHourFreesAt ?? p.fiveHourResetsAt
+                return L("\(Phrases.providerName(provider)): в этих 5 часах потрачено \(Phrases.points(spent))% недели при норме \(Phrases.points(cap))% с запасом. \(next.map { "Следующие 5 часов начнутся в \(Phrases.time($0)) с полной нормой." } ?? "")",
+                         "\(Phrases.providerName(provider)): \(Phrases.points(spent))% of the week spent in these 5 hours, over the \(Phrases.points(cap))% norm with reserve. \(next.map { "The next 5 hours start at \(Phrases.time($0)) with a full norm." } ?? "")")
             }
         }
         if let over = pools.filter({ $0.snapshot.isLongWindow }).first(where: { ($0.available ?? 0) < -tolerance }),
-           let a = over.available, let plan = over.plan {
-            let back = now.addingTimeInterval((-a + 0.5) / max(plan.ratePerHour, 0.0001) * 3600)
+           let a = over.available {
+            let back = over.planBackAt ?? over.snapshot.resetsAt
             return L("\(Phrases.providerName(provider)) впереди плана на \(Phrases.points(-a))%: заряд вернётся к \(Phrases.time(back)).",
                      "\(Phrases.providerName(provider)) is \(Phrases.points(-a))% ahead of plan: charge returns by \(Phrases.time(back)).")
         }

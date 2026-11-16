@@ -201,7 +201,7 @@ struct SmartLayout: View {
         if let out = budget?.runsOutAt {
             return Status(text: L("Притормози", "Slow down"), color: .orange, detail: L("В твоём темпе неделя кончится \(Phrases.time(out)).", "At your pace the week runs out by \(Phrases.time(out))."))
         }
-        if let norm = main.fiveHourBudget, norm > 0, let spent = main.spentLast5h {
+        if let norm = main.fiveHourBudget, norm > 0, let spent = main.spentThisSlot {
             let cap = main.fiveHourCap ?? norm // the norm, plus what you added from the reserve
             if spent > cap + 0.05 {
                 // The capsule shows how far over and when it opens again: nothing to add below.
@@ -246,8 +246,8 @@ struct SmartLayout: View {
 
     /// Name, the traffic-light phrase as the card's title, when the week resets — and the blob, big.
     private func header(blob: BlobModel, status: Status, main: LimitRow, window: LimitRow?) -> some View {
-        // Both resets as icon + time: the clock for the rolling 5 hours (when they empty out if nothing more is
-        // spent), the calendar for the week. Then the provider's own window while it is low.
+        // Both resets as icon + time: the clock for the current 5-hour slot (when the next one starts from zero),
+        // the calendar for the week. Then the provider's own window while it is low.
         func item(_ icon: String, _ text: String, help: String) -> some View {
             HStack(spacing: 4) {
                 Image(systemName: icon).font(.system(size: 11, weight: .medium))
@@ -256,10 +256,10 @@ struct SmartLayout: View {
             .help(help)
         }
         let caption = HStack(spacing: 12) {
-            if let clears = main.fiveHourClearsAt {
-                item("clock", Phrases.time(clears),
-                     help: L("5 часов обнулятся к \(Phrases.time(clears)), если больше не тратить",
-                             "The 5 hours clear by \(Phrases.time(clears)) if you stop spending"))
+            if let next = main.fiveHourResetsAt {
+                item("clock", Phrases.time(next),
+                     help: L("Новые 5 часов с полной нормой начнутся в \(Phrases.time(next)); что не потратишь до этого — уйдёт в резерв",
+                             "The next 5 hours start at \(Phrases.time(next)) with a full norm; whatever you leave unspent goes to the reserve"))
             }
             item("calendar", Phrases.time(main.resetsAt),
                  help: L("Сброс недели \(Phrases.time(main.resetsAt))", "The week resets \(Phrases.time(main.resetsAt))"))
@@ -316,8 +316,7 @@ struct SmartLayout: View {
     /// Whether this card's 5-hour bar shows "+": the only thing the slot is for.
     private func hasPlus(_ main: LimitRow) -> Bool {
         guard onBoost != nil, let norm = main.fiveHourBudget, norm > 0 else { return false }
-        let extra = max(0, (main.fiveHourCap ?? norm) - norm)
-        return Pacer.boostStep(norm: norm, battery: max(main.battery ?? 0, 0), boost: extra) > 0.05
+        return main.boostStep > 0.05
     }
 
     /// The bar itself: label on the left, value on the right, fill drawn by the caller.
@@ -347,17 +346,16 @@ struct SmartLayout: View {
         .help(help)
     }
 
-    /// Our own rolling 5-hour limit. The bar is the norm: 100 % fills it. Whatever goes past the norm is taken
+    /// Our own 5-hour limit, one fixed slot of the week at a time. The bar is the slot's norm: 100 % fills it. Whatever goes past the norm is taken
     /// from the top-up added with "+", drawn as a second, smaller bar ("+22%") that fills in turn.
     private func fiveHourCapsule(_ main: LimitRow, tint: Color) -> some View {
         let norm = max(main.fiveHourBudget ?? 0, 0.0001)
-        let spent = max(main.spentLast5h ?? 0, 0)
+        let spent = max(main.spentThisSlot ?? 0, 0)
         let cap = max(main.fiveHourCap ?? norm, norm)
         let extra = cap - norm
         let boosted = extra > 0.05
         let over = spent > cap + 0.05
-        let battery = max(main.battery ?? 0, 0)
-        let step = Pacer.boostStep(norm: norm, battery: battery, boost: extra)
+        let step = main.boostStep
         let normFill = min(spent, norm) / norm
         let boostFill = boosted ? min(max(spent - norm, 0), extra) / extra : 0
         let barColor = over ? Color.orange : tint
@@ -366,12 +364,11 @@ struct SmartLayout: View {
         let extraText = "+\(Int((extra / norm * 100).rounded()))%"
         var help = L("Лимит Slowburn на 5 часов: норма \(Fmt.pct(norm)) недели, потрачено \(Fmt.pct(spent)).",
                      "Slowburn's 5-hour limit: a norm of \(Fmt.pct(norm)) of the week, \(Fmt.pct(spent)) spent.")
-        help += L(" Лимит скользящий: траты старше 5 часов списываются сами, отдельного сброса нет.",
-                  " It rolls: spending older than 5 hours drops off by itself, there is no separate reset.")
-        if over, let free = main.fiveHourFreesAt {
-            help += L(" Снова в норме в \(Phrases.time(free)), если не тратить.", " Back within the norm at \(Phrases.time(free)) if you stop spending.")
+        help += L(" Неделя поделена на 5-часовые отрезки с одинаковой нормой; непотраченное уходит в резерв.",
+                  " The week is cut into 5-hour slots with the same norm; whatever is left unspent goes to the reserve.")
+        if let next = main.fiveHourResetsAt {
+            help += L(" Новый отрезок начнётся в \(Phrases.time(next)).", " The next slot starts at \(Phrases.time(next)).")
         }
-        if let clear = main.fiveHourClearsAt { help += L(" Полностью обнулится к \(Phrases.time(clear)).", " Fully clear by \(Phrases.time(clear)).") }
 
         func number(_ ink: Color) -> some View {
             HStack(spacing: 5) {
@@ -464,8 +461,8 @@ struct SmartLayout: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .help(L("Добавить к лимиту на 5 часов ещё \(Fmt.pct(step)) из резерва на 5 часов",
-                             "Add \(Fmt.pct(step)) from the reserve to the 5-hour limit, for 5 hours"))
+                    .help(L("Добавить к этим 5 часам ещё \(Fmt.pct(step)) из резерва" + (main.fiveHourResetsAt.map { " — до \(Phrases.time($0))" } ?? ""),
+                             "Add \(Fmt.pct(step)) from the reserve to these 5 hours" + (main.fiveHourResetsAt.map { ", until \(Phrases.time($0))" } ?? "")))
                 } else {
                     Color.clear
                 }
@@ -513,17 +510,18 @@ struct SmartLayout: View {
     /// The reserve on the week's own scale (0–100 % of the week): green when saved up, orange when in debt.
     /// The share lent to the 5-hour limit with "+" is drawn lighter.
     private func reserveCapsule(_ main: LimitRow) -> some View {
-        let gap = (main.planMarker ?? main.used) - main.used
+        // What earlier slots left unspent (less what this slot took past its norm); in debt, how far.
+        let gap = (main.available ?? 0) < 0 ? (main.available ?? 0) : (main.battery ?? 0)
         let debt = gap < 0
         let lent = max(0, min(main.fiveHourBoost ?? 0, gap))
         let auto = main.fiveHourAuto
         let help = debt
-            ? L("Ты потратил на \(Fmt.pct(-gap)) больше, чем положено по плану к этому моменту.",
-                "You've spent \(Fmt.pct(-gap)) more than the plan allows by now.")
-            : auto ? L("Резерв — на столько ты ниже плана с начала недели. Лимит на 5 часов берёт из него сам, сколько нужно.",
-                       "Reserve: how far under plan you are since the week began. The 5-hour limit draws from it as needed.")
-                   : L("Резерв — на столько ты ниже плана с начала недели. Из него «+» добавляет к лимиту на 5 часов.",
-                       "Reserve: how far under plan you are since the week began. “+” moves some of it to the 5-hour limit.")
+            ? L("Ты потратил на \(Fmt.pct(-gap)) больше, чем выдано по плану вместе с этими 5 часами.",
+                "You've spent \(Fmt.pct(-gap)) more than the plan has handed out, these 5 hours included.")
+            : auto ? L("Резерв — всё, что не потрачено в прошлых 5-часовых отрезках недели. Лимит на 5 часов берёт из него сам, сколько нужно.",
+                       "Reserve: everything earlier 5-hour slots of the week left unspent. The 5-hour limit draws from it as needed.")
+                   : L("Резерв — всё, что не потрачено в прошлых 5-часовых отрезках недели. Из него «+» добавляет к этим 5 часам.",
+                       "Reserve: everything earlier 5-hour slots of the week left unspent. “+” moves some of it to these 5 hours.")
         return capsule(L("Резерв", "Reserve"), fillFraction: abs(gap) / 100, help: help) { W in
             let x: (Double) -> CGFloat = { max(0, W * CGFloat(min($0, 100)) / 100) }
             ZStack(alignment: .leading) {
@@ -569,8 +567,8 @@ struct SmartLayout: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(on ? L("Лимит на 5 часов сам берёт из резерва сколько нужно — без «+» и без срока. Сними, чтобы добавлять вручную.",
-                       "The 5-hour limit draws what it needs from the reserve — no “+”, no time limit. Uncheck to add by hand.")
+            .help(on ? L("Лимит на 5 часов сам берёт из резерва сколько нужно — без «+», в каждом отрезке. Сними, чтобы добавлять вручную.",
+                       "The 5-hour limit draws what it needs from the reserve — no “+”, in every slot. Uncheck to add by hand.")
                      : L("Когда норма на 5 часов кончится, работа продолжится за счёт резерва — без нажатий «+».",
                          "When the 5-hour norm runs out, work carries on from the reserve — no need to press “+”."))
             .accessibilityLabel(L("Брать из резерва автоматически", "Draw from the reserve automatically"))

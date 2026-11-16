@@ -39,8 +39,8 @@ curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh -s -- --uninstall
 
 ## What it does
 
-- **Runway, not percentages.** For each provider: a rolling **5-hour** bar (how much of a healthy five-hour stretch you've used, and when it frees up), the **week** against an even plan, and a **reserve** — what lighter hours saved.
-- **Borrow from the reserve.** Press **+** to lend the 5-hour limit a bit more for the next five hours, or tick *Draw from the reserve automatically*.
+- **Runway, not percentages.** For each provider: a **5-hour** bar (the week is cut into equal five-hour slots: how much of this slot's norm you've used, and when the next one starts — whatever a slot leaves unspent goes to the reserve), the **week** against an even plan, and a **reserve** — what lighter hours saved.
+- **Borrow from the reserve.** Press **+** to lend the current 5-hour slot a bit more, or tick *Draw from the reserve automatically*.
 - **Soft brake.** With the hooks installed, Claude Code and Codex pause before a prompt or tool call when you're over the plan. They wait in the menu bar: **Continue**, **+30 min** without the brake, or **Stop** (the agent wraps up and writes down where it stopped). Start a message with `++` to skip the brake once.
 - **One big switch.** *Limits on/off* at the top of the panel: off, every hook lets everything through and Slowburn just keeps counting.
 - **Companions.** An orange blob for Claude and a violet one for Codex. While an agent works, its blob sits at the laptop doing what the agent does (editing code, running tests, searching the web…), read live from the session log. Between tasks it picks one of forty pastimes.
