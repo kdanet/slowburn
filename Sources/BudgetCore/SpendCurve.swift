@@ -23,6 +23,18 @@ public struct SpendCurve: Sendable, Equatable {
 
     public init(buckets: [Bucket]) { self.buckets = buckets.sorted { $0.start < $1.start } }
 
+    /// The size of the slices local spending is counted in.
+    public static let slice = 300
+
+    /// Slices of `size` seconds keyed by their start; the one still going on holds only what was spent up to now.
+    public init(slices: [Int: Double], size: Int = SpendCurve.slice, now: Date) {
+        self.init(buckets: slices.map { key, amount in
+            let start = Date(timeIntervalSince1970: TimeInterval(key))
+            return Bucket(start: start, length: Swift.min(TimeInterval(size), Swift.max(1, now.timeIntervalSince(start))),
+                          amount: amount)
+        })
+    }
+
     /// From when the curve knows anything.
     public var coveredFrom: Date? { buckets.first?.start }
 
@@ -36,9 +48,10 @@ public struct SpendCurve: Sendable, Equatable {
         return sum
     }
 
-    /// Reading units (percent) per local unit: the climb between the first and the last step up the curve covers,
-    /// over what the curve spent between them. Both ends are moments a reading ticked up, so both sit on a boundary
-    /// of a whole percent. nil until the readings have climbed at least `minClimb`.
+    /// Reading units (percent) per local unit, fitted through the moments the readings ticked up. Each tick sits
+    /// on a boundary of a whole percent, so the ticks lie on one line against the curve's running total; a fit
+    /// through all of them (not just the two ends) shrugs off a tick seen late because nothing was watching.
+    /// nil until the readings have climbed at least `minClimb` over what the curve covers.
     public func rate(history: [UsagePoint], minClimb: Double = 2) -> Double? {
         guard let covered = coveredFrom else { return nil }
         let sorted = history.sorted { $0.at < $1.at }
@@ -47,8 +60,12 @@ public struct SpendCurve: Sendable, Equatable {
             steps.append(p)
         }
         guard let first = steps.first, let last = steps.last, last.used - first.used >= minClimb else { return nil }
-        let spent = amount(from: first.at, to: last.at)
-        guard spent > 0 else { return nil }
-        return (last.used - first.used) / spent
+        let xs = steps.map { amount(from: first.at, to: $0.at) }, ys = steps.map(\.used)
+        let mx = xs.reduce(0, +) / Double(xs.count), my = ys.reduce(0, +) / Double(ys.count)
+        var sxy = 0.0, sxx = 0.0
+        for (x, y) in zip(xs, ys) { sxy += (x - mx) * (y - my); sxx += (x - mx) * (x - mx) }
+        guard sxx > 0 else { return nil }
+        let rate = sxy / sxx
+        return rate > 0 && rate.isFinite ? rate : nil
     }
 }

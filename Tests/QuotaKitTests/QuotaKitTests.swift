@@ -196,3 +196,29 @@ private func state(level: Level, reasons: [String], generatedAt: Date, override:
     }
     #expect(reason.contains("credits"))
 }
+
+@Test func codexLedgerCountsEachTurnOnceAndSkipsCreditTurns() {
+    func line(total: Int, input: Int, cached: Int, output: Int, primary: Double) -> Data {
+        Data("""
+        {"timestamp":"2026-11-15T13:48:39.613Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":\(total)},"last_token_usage":{"input_tokens":\(input),"cached_input_tokens":\(cached),"output_tokens":\(output)}},"rate_limits":{"primary":{"used_percent":\(primary),"window_minutes":300},"secondary":{"used_percent":18.0,"window_minutes":10080}}}}
+        """.utf8)
+    }
+    var ledger = CodexTokenLedger()
+    ledger.ingest(line: line(total: 100, input: 1000, cached: 900, output: 10, primary: 40), file: "a")
+    ledger.ingest(line: line(total: 100, input: 1000, cached: 900, output: 10, primary: 40), file: "a") // repeated event
+    ledger.ingest(line: line(total: 200, input: 1000, cached: 0, output: 0, primary: 100), file: "a")  // paid from credits
+    let counted: Double = ledger.slices.values.reduce(0, +)
+    #expect(counted == 270) // 100 fresh + 900 cached at a tenth + 10 output at eight times
+}
+
+@Test func claudeCurveJoinsOldHoursToNewSlicesWithoutCountingTwice() throws {
+    var ledger = ClaudeTokenLedger()
+    var c = TokenCounts()
+    c.input = 1000
+    ledger.hours[3600] = ["claude-opus-5-5": c]          // 1000 in the hour 1:00–2:00
+    ledger.slices = [5400: ["claude-opus-5-5": 400]]      // 400 of it at 1:30, kept as a slice
+    let curve = try #require(ledger.curve(for: PoolKey(.claude, "seven_day"), now: Date(timeIntervalSince1970: 7200)))
+    let total = curve.amount(from: Date(timeIntervalSince1970: 0), to: Date(timeIntervalSince1970: 7200))
+    #expect(abs(total - 1000) < 1e-6)
+    #expect(ledger.curve(for: PoolKey(.claude, "seven_day_fable"), now: Date(timeIntervalSince1970: 7200)) == nil)
+}

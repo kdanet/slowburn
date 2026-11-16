@@ -94,6 +94,8 @@ public struct PoolStatus: Codable, Sendable, Equatable {
     public var fiveHourCap: Double?
     /// The part of `fiveHourCap` above the norm that you added by hand.
     public var fiveHourBoost: Double?
+    /// Percent per unit of the local spend curve (see `SpendCurve.rate`), kept for the next week's first hours.
+    public var spendRate: Double?
     /// When the hand-added part runs out and the limit is back to the norm.
     public var boostUntil: Date?
     /// The reserve feeds the 5-hour limit on its own, all of it (the reserve's checkbox).
@@ -188,7 +190,8 @@ public enum Pacer {
 
     public static func evaluate(snapshot s: Snapshot, plan: PacePlan?, history: [UsagePoint],
                                 settings: PaceSettings, now: Date, fiveHourBoost: Double = 0,
-                                boostUntil: Date? = nil, curve: SpendCurve? = nil) -> PoolStatus {
+                                boostUntil: Date? = nil, curve: SpendCurve? = nil,
+                                curveRate: Double? = nil) -> PoolStatus {
         let current = UsagePoint(at: Swift.max(s.observedAt, history.map(\.at).max() ?? s.observedAt), used: s.usedPercent)
         let freshness = Freshness.of(s.observedAt, now: now, staleAfter: settings.staleAfter)
         var status = PoolStatus(snapshot: s, freshness: freshness, level: .green, correctionDetected: false, reasons: [])
@@ -225,8 +228,10 @@ public enum Pacer {
             // local measure covers the 5 hours, it says how much went in between — kept within a step of
             // what the readings say, since it can miss spending elsewhere (claude.ai, another Mac).
             var model: ((Date) -> Double)?
-            if let curve, let rate = curve.rate(history: history + [current]),
-               let covered = curve.coveredFrom, covered <= since {
+            // Early in a week there are too few ticks to measure the rate: the last week's (`curveRate`) stands in.
+            let rate = curve?.rate(history: history + [current]) ?? curveRate
+            status.spendRate = rate
+            if let curve, let rate, let covered = curve.coveredFrom, covered <= since {
                 let raw = rate * curve.amount(from: since, to: now)
                 let refined = raw.clamped(Swift.max(0, spent5h - s.precision), spent5h + s.precision)
                 if raw > 0 {

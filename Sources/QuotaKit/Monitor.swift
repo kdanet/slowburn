@@ -119,7 +119,10 @@ public final class Monitor: @unchecked Sendable {
         var offsets = JSONFile.load(OffsetsFile.self, from: paths.offsets) ?? OffsetsFile()
 
         var codexReader = IncrementalReader(offsets: offsets.codex, initialTail: 8 << 20)
-        var codex = CodexSource.snapshots(paths: paths, reader: &codexReader, now: now)
+        var codexTokens = JSONFile.load(CodexTokenLedger.self, from: paths.codexTokens)
+            ?? CodexTokenLedger.backfill(paths: paths, now: now)
+        var codex = CodexSource.snapshots(paths: paths, reader: &codexReader, ledger: &codexTokens, now: now)
+        try? JSONFile.save(codexTokens, to: paths.codexTokens)
         offsets.codex = codexReader.offsets
         let codexLive = await CodexLiveSource.fetch(paths: paths, now: now)
         codex.quota += codexLive.snapshots
@@ -143,6 +146,9 @@ public final class Monitor: @unchecked Sendable {
         try? JSONFile.save(history, to: paths.history)
 
         var plans = JSONFile.load([String: PacePlan].self, from: paths.plans) ?? [:]
+        // Each pool's last measured spend rate, for a new week that has not ticked enough to measure its own.
+        let lastRates = Dictionary((readState()?.pools ?? []).compactMap { p in p.spendRate.map { (p.snapshot.pool.storageKey, $0) } },
+                                   uniquingKeysWith: { a, _ in a })
         var statuses: [PoolStatus] = []
         for (key, s) in history.latest.sorted(by: { $0.value.pool < $1.value.pool }) {
             var plan: PacePlan?
@@ -165,7 +171,9 @@ public final class Monitor: @unchecked Sendable {
                                         settings: poolSettings, now: now,
                                         fiveHourBoost: auto ? .greatestFiniteMagnitude : Boosts.total(s.pool.provider, paths: paths, now: now),
                                         boostUntil: auto ? nil : Boosts.until(s.pool.provider, paths: paths, now: now),
-                                        curve: tokens.curve(for: s.pool, now: now))
+                                        curve: tokens.curve(for: s.pool, now: now)
+                                            ?? codexTokens.curve(for: s.pool, isLongWindow: s.isLongWindow, now: now),
+                                        curveRate: lastRates[key])
             if auto { status.fiveHourAuto = true }
             if s.isLongWindow, now < s.resetsAt {
                 status.smart = Smart.compute(snapshot: s, plan: plan, history: history.points[key] ?? [], now: now)

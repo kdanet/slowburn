@@ -7,14 +7,24 @@ public enum CodexSource {
     static let marker = Data("\"rate_limits\"".utf8)
 
     public static func snapshots(paths: Paths, reader: inout IncrementalReader, now: Date) -> (quota: [Snapshot], credits: [UsagePoint]) {
+        var ledger = CodexTokenLedger()
+        return snapshots(paths: paths, reader: &reader, ledger: &ledger, now: now)
+    }
+
+    /// Also feeds the turns' token counts to `ledger`.
+    public static func snapshots(paths: Paths, reader: inout IncrementalReader, ledger: inout CodexTokenLedger,
+                                 now: Date) -> (quota: [Snapshot], credits: [UsagePoint]) {
         var quota: [Snapshot] = []
         var credits: [UsagePoint] = []
-        for file in recentFiles(under: paths.codexSessions, ext: "jsonl", modifiedWithin: 8 * 86400, now: now) {
+        let files = recentFiles(under: paths.codexSessions, ext: "jsonl", modifiedWithin: 8 * 86400, now: now)
+        for file in files {
             for line in reader.newLines(in: file) where line.range(of: marker) != nil {
                 quota.append(contentsOf: parse(line: line))
                 if let c = parseCredits(line: line) { credits.append(c) }
+                ledger.ingest(line: line, file: file.path)
             }
         }
+        ledger.trim(keepingSince: now.addingTimeInterval(-8 * 86400), liveFiles: Set(files.map(\.path)))
         return (quota, credits)
     }
 
@@ -139,5 +149,63 @@ func windowTitle(minutes: Int) -> String {
     case 10080: L("Неделя", "Week")
     case 1440: L("Сутки", "Day")
     default: minutes % 60 == 0 ? L("\(minutes / 60) ч", "\(minutes / 60) h") : L("\(minutes) мин", "\(minutes) min")
+    }
+}
+
+/// Codex's own spending in 5-minute slices, from the `token_count` events in its rollouts, for filling in between the
+/// week's whole-percent readings (see `SpendCurve`). Turns paid from credits — while a window is at 100% —
+/// are left out: they do not move the week.
+public struct CodexTokenLedger: Codable, Sendable {
+    /// 5-minute slice (epoch seconds, floored) → weighted tokens. Codex works in bursts: an hour is too coarse.
+    public var slices: [Int: Double] = [:]
+    /// rollout file → its running total, so an event repeated without a new turn is not counted twice.
+    public var lastTotal: [String: Int] = [:]
+
+    public init() {}
+
+    /// Rough relative prices: a cached input token a tenth of a fresh one, output (with reasoning) eight times it.
+    static func weight(_ usage: [String: Any]) -> Double {
+        let input = number(usage["input_tokens"]) ?? 0
+        let cached = Swift.min(input, number(usage["cached_input_tokens"]) ?? 0)
+        let output = number(usage["output_tokens"]) ?? 0
+        return (input - cached) + 0.1 * cached + 8 * output
+    }
+
+    public mutating func ingest(line: Data, file: String) {
+        guard let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+              let payload = obj["payload"] as? [String: Any], payload["type"] as? String == "token_count",
+              let info = payload["info"] as? [String: Any],
+              let last = info["last_token_usage"] as? [String: Any],
+              let total = (info["total_token_usage"] as? [String: Any]).flatMap({ number($0["total_tokens"]) }),
+              let at = (obj["timestamp"] as? String).flatMap(parseISODate) else { return }
+        let t = Int(total)
+        guard lastTotal[file] != t else { return }
+        lastTotal[file] = t
+        if let limits = payload["rate_limits"] as? [String: Any],
+           ["primary", "secondary"].contains(where: { (limits[$0] as? [String: Any]).flatMap { number($0["used_percent"]) } ?? 0 >= 100 }) {
+            return
+        }
+        let slice = Int(at.timeIntervalSince1970) / SpendCurve.slice * SpendCurve.slice
+        slices[slice, default: 0] += Self.weight(last)
+    }
+
+    public mutating func trim(keepingSince cutoff: Date, liveFiles: Set<String>) {
+        let h = Int(cutoff.timeIntervalSince1970)
+        slices = slices.filter { $0.key >= h }
+        lastTotal = lastTotal.filter { liveFiles.contains($0.key) }
+    }
+
+    /// First run: the rollouts of the last 8 days, read in full once (they were already read for their limits).
+    public static func backfill(paths: Paths, now: Date) -> CodexTokenLedger {
+        var ledger = CodexTokenLedger()
+        var reader = IncrementalReader(offsets: [:], initialTail: 256 << 20)
+        _ = CodexSource.snapshots(paths: paths, reader: &reader, ledger: &ledger, now: now)
+        return ledger
+    }
+
+    /// The week's spending curve; only the account's own weekly pool (`codex.<minutes>`) is covered.
+    public func curve(for pool: PoolKey, isLongWindow: Bool, now: Date) -> SpendCurve? {
+        guard pool.provider == .codex, pool.id.hasPrefix("codex."), isLongWindow, !slices.isEmpty else { return nil }
+        return SpendCurve(slices: slices, now: now)
     }
 }

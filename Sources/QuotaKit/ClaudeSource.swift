@@ -308,6 +308,9 @@ public struct ClaudeTokenLedger: Codable, Sendable {
     public var hours: [Int: [String: TokenCounts]] = [:]
     /// message ids already counted, with the hour they landed in (a message spans several lines).
     public var seen: [String: Int] = [:]
+    /// The same spending in 5-minute slices, weighted by price (see `curve`): slice → model → weighted tokens.
+    /// Kept since the app started writing it; older hours come from `hours`.
+    public var slices: [Int: [String: Double]]? = [:]
 
     public init() {}
 
@@ -330,12 +333,15 @@ public struct ClaudeTokenLedger: Codable, Sendable {
         let hour = Int(at.timeIntervalSince1970) / 3600 * 3600
         seen[id] = hour
         hours[hour, default: [:]][model, default: TokenCounts()].add(c)
+        let slice = Int(at.timeIntervalSince1970) / SpendCurve.slice * SpendCurve.slice
+        slices?[slice, default: [:]][model, default: 0] += Self.weighted(c, model: model)
     }
 
     public mutating func trim(keepingSince cutoff: Date) {
         let h = Int(cutoff.timeIntervalSince1970)
         hours = hours.filter { $0.key >= h }
         seen = seen.filter { $0.value >= h }
+        slices = slices?.filter { $0.key >= h }
     }
 
     public func totals(since: Date) -> [String: TokenCounts] {
@@ -355,19 +361,31 @@ public struct ClaudeTokenLedger: Codable, Sendable {
         guard pool.provider == .claude, pool.id.hasPrefix("seven_day") else { return nil }
         let scope = pool.id.dropFirst("seven_day".count).drop(while: { $0 == "_" }).lowercased()
         guard scope.isEmpty || ["opus", "sonnet", "haiku", "fable"].contains(scope) else { return nil }
-        var buckets: [SpendCurve.Bucket] = []
-        for (hour, models) in hours {
-            var amount = 0.0
-            for (model, c) in models where scope.isEmpty || model.lowercased().contains(scope) {
-                amount += Self.weight(model) * (Double(c.input) + 1.25 * Double(c.cacheWrite)
-                                                + 0.1 * Double(c.cacheRead) + 5 * Double(c.output))
-            }
-            let start = Date(timeIntervalSince1970: TimeInterval(hour))
-            // The hour still going on holds only what was spent up to now.
-            let length = Swift.min(3600, Swift.max(60, now.timeIntervalSince(start)))
-            buckets.append(SpendCurve.Bucket(start: start, length: length, amount: amount))
+        func counts(_ model: String) -> Bool { scope.isEmpty || model.lowercased().contains(scope) }
+        var amounts: [Int: Double] = [:]
+        for (slice, models) in slices ?? [:] {
+            amounts[slice] = models.filter { counts($0.key) }.values.reduce(0, +)
         }
-        return buckets.isEmpty ? nil : SpendCurve(buckets: buckets)
+        // Hours from before the slices were kept: whole-hour buckets; the hour they began in keeps only its
+        // part before the first slice.
+        let firstSlice = amounts.keys.min() ?? Int.max
+        var buckets = SpendCurve(slices: amounts, now: now).buckets
+        for (hour, models) in hours where hour < firstSlice {
+            var amount = models.filter { counts($0.key) }.reduce(0) { $0 + Self.weighted($1.value, model: $1.key) }
+            var end = Swift.min(Double(hour + 3600), now.timeIntervalSince1970)
+            if hour + 3600 > firstSlice {
+                amount -= amounts.filter { $0.key < hour + 3600 }.values.reduce(0, +)
+                end = Double(firstSlice)
+            }
+            guard amount > 0 else { continue }
+            buckets.append(SpendCurve.Bucket(start: Date(timeIntervalSince1970: TimeInterval(hour)),
+                                             length: Swift.max(1, end - Double(hour)), amount: amount))
+        }
+        return buckets.contains { $0.amount > 0 } ? SpendCurve(buckets: buckets) : nil
+    }
+
+    static func weighted(_ c: TokenCounts, model: String) -> Double {
+        weight(model) * (Double(c.input) + 1.25 * Double(c.cacheWrite) + 0.1 * Double(c.cacheRead) + 5 * Double(c.output))
     }
 
     static func weight(_ model: String) -> Double {
@@ -379,6 +397,7 @@ public struct ClaudeTokenLedger: Codable, Sendable {
 
     public static func update(paths: Paths, reader: inout IncrementalReader, now: Date) -> ClaudeTokenLedger {
         var ledger = JSONFile.load(ClaudeTokenLedger.self, from: paths.claudeTokens) ?? ClaudeTokenLedger()
+        if ledger.slices == nil { ledger.slices = [:] } // a ledger from before slices: start keeping them now
         for file in recentFiles(under: paths.claudeProjects, ext: "jsonl", modifiedWithin: 86400, now: now) {
             for line in reader.newLines(in: file) where line.range(of: marker) != nil {
                 ledger.ingest(line: line)

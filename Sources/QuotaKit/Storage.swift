@@ -45,6 +45,7 @@ public struct Paths: Sendable {
     public var history: URL { support.appendingPathComponent("history.json") }
     public var offsets: URL { support.appendingPathComponent("offsets.json") }
     public var claudeTokens: URL { support.appendingPathComponent("claude-tokens.json") }
+    public var codexTokens: URL { support.appendingPathComponent("codex-tokens.json") }
     public var statusLineInbox: URL { support.appendingPathComponent("claude-statusline.json") }
     public var override: URL { support.appendingPathComponent("override.json") }
     public var settings: URL { support.appendingPathComponent("settings.json") }
