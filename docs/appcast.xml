@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Slowburn</title>
+    <link>https://kdanet.github.io/slowburn/appcast.xml</link>
+    <description>Updates for Slowburn, written by scripts/release.sh.</description>
+    <language>en</language>
+    <!-- releases -->
+  </channel>
+</rss>

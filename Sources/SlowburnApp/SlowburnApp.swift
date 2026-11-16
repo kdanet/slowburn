@@ -166,6 +166,7 @@ struct RowDivider: View {
 struct PopoverView: View {
     @ObservedObject var model: Model
     @ObservedObject var holds = HoldsModel.shared
+    @ObservedObject var updates = Updates.shared
     /// Off for `--snapshot`: ImageRenderer cannot draw AppKit views.
     var anchored = true
 
@@ -223,6 +224,13 @@ struct PopoverView: View {
                         .keyboardShortcut("r")
                     Button(L("Перепланировать от текущего остатка", "Replan from what's left")) { model.replan() }
                     Divider()
+                    if updates.available {
+                        Button(L("Проверить обновления…", "Check for Updates…")) { updates.check() }
+                            .disabled(!updates.canCheck)
+                    }
+                    if let v = updates.version {
+                        Text("Slowburn \(v)")
+                    }
                     Button(L("Выйти из Slowburn", "Quit Slowburn")) { NSApp.terminate(nil) }
                         .keyboardShortcut("q")
                 } label: {
@@ -310,6 +318,10 @@ struct SlowburnApp: App {
     init() {
         NSApplication.shared.setActivationPolicy(.accessory) // menu bar only, no Dock icon
         let args = CommandLine.arguments
+        if !args.contains(where: { $0.hasPrefix("--") }) {
+            HookBinary.refresh()
+            _ = Updates.shared // starts Sparkle's scheduled checks inside Slowburn.app
+        }
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {
             Self.snapshot(to: args[i + 1])
         }

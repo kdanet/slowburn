@@ -4,3 +4,4 @@ probes/logs/
 probes/backups/
 .DS_Store
 .claude/
+dist/
