@@ -17,7 +17,7 @@
 curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh
 ```
 
-The script puts the latest release of `Slowburn.app` — signed and notarized by Apple — in `~/Applications`, starts it, and starts it again at login. After that the app updates itself (Sparkle; *Check for Updates…* is in the gear menu). Needs macOS 14+. You can also [download the .zip](https://github.com/kdanet/slowburn/releases/latest) yourself.
+The script puts the latest release of `Slowburn.app` — signed and notarized by Apple — in `~/Applications`, starts it, and starts it again at login. After that the app updates itself (Sparkle; *Check for Updates…* is in the gear menu). Needs macOS 14+. You can also [download the .dmg](https://github.com/kdanet/slowburn/releases/latest/download/Slowburn.dmg) yourself.
 
 To build it on your Mac instead (needs git and Swift 6 — Xcode 16 or later, or its Command Line Tools):
 

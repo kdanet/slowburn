@@ -6,7 +6,8 @@
 # 1. a universal build (Apple silicon + Intel), signed with the Developer ID certificate in your Keychain;
 # 2. notarized by Apple and stapled, so it opens without a Gatekeeper warning;
 # 3. signed for Sparkle with the EdDSA key in your Keychain (made by Sparkle's generate_keys);
-# 4. published as a GitHub release (Slowburn-<version>.zip, plus Slowburn.zip for the installer's "latest");
+# 4. published as a GitHub release: Slowburn-<version>.dmg to download by hand (Slowburn.dmg is the site's
+#    "latest"), Slowburn-<version>.zip for Sparkle and Slowburn.zip for the install script;
 # 5. announced in docs/appcast.xml, which the app checks once a day.
 #
 # What's new goes in release-notes/<version>.en.md and .ru.md: a few "- " lines in plain words. The update
@@ -30,6 +31,7 @@ PROFILE="${SLOWBURN_NOTARY_PROFILE:-slowburn}"
 DIST="dist/$VERSION"
 APP="$DIST/Slowburn.app"
 ZIP="$DIST/Slowburn-$VERSION.zip"
+DMG="$DIST/Slowburn-$VERSION.dmg"
 SPARKLE_BIN=".build/artifacts/sparkle/Sparkle/bin"
 
 say() { printf '\033[38;5;209m◔\033[0m %s\n' "$1"; }
@@ -78,6 +80,10 @@ spctl --assess --type execute "$APP" || fail "Gatekeeper rejects the stapled app
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 cp "$ZIP" "$DIST/Slowburn.zip"
 say "Notarized: $ZIP"
+say "Packing and notarizing the disk image"
+SLOWBURN_SIGN_IDENTITY="$IDENTITY" SLOWBURN_NOTARY_PROFILE="$PROFILE" scripts/dmg.sh "$APP" "$DMG"
+cp "$DMG" "$DIST/Slowburn.dmg"
+say "Notarized: $DMG"
 
 # --- Sparkle signature and the appcast entry.
 SIG="$("$SPARKLE_BIN/sign_update" --account slowburn "$ZIP")"   # sparkle:edSignature="…" length="…"
@@ -110,9 +116,9 @@ fi
 say "Publishing $TAG on GitHub"
 git tag -a "$TAG" -m "Slowburn $VERSION"
 git push --quiet origin "$TAG"
-gh release create "$TAG" "$ZIP" "$DIST/Slowburn.zip" --repo "$REPO" --title "Slowburn $VERSION" \
+gh release create "$TAG" "$DMG" "$DIST/Slowburn.dmg" "$ZIP" "$DIST/Slowburn.zip" --repo "$REPO" --title "Slowburn $VERSION" \
   --notes "$(python3 scripts/notes.py github "$VERSION")"
 git add docs/appcast.xml
 git commit --quiet -m "Release $VERSION: appcast"
 git push --quiet origin main
-say "Done. Installed copies pick up $VERSION within a day; the installer serves it now."
+say "Done. Installed copies pick up $VERSION within a day; the site and the installer serve it now."
