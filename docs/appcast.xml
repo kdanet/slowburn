@@ -12,7 +12,8 @@
       <sparkle:version>21</sparkle:version>
       <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/kdanet/slowburn/releases/tag/v0.2.0</sparkle:releaseNotesLink>
+      <description><![CDATA[<ul><li>The 5-hour limit now runs in slots: the week is cut into equal five-hour stretches, the bar starts from zero in each, and whatever a slot leaves unspent goes to the reserve.</li><li>The clock shows when the current slot ends. It no longer moves forward while you work.</li><li>“+” adds to the current slot, until it ends.</li><li>“Draw from the reserve automatically” now gives you all of the reserve, not about half of it.</li><li>Clean panel corners on macOS 26 and later.</li></ul>]]></description>
+      <description xml:lang="ru"><![CDATA[<ul><li>Лимит на 5 часов теперь идёт отрезками: неделя поделена на равные 5-часовые промежутки, в каждом шкала начинается с нуля, а непотраченное уходит в резерв.</li><li>Время у часов — конец текущего отрезка. Оно больше не уезжает вперёд, пока ты работаешь.</li><li>«+» добавляет к текущему отрезку, до его конца.</li><li>«Брать из резерва автоматически» теперь даёт весь резерв, а не примерно половину.</li><li>Чистые углы панели на macOS 26 и новее.</li></ul>]]></description>
       <enclosure url="https://github.com/kdanet/slowburn/releases/download/v0.2.0/Slowburn-0.2.0.zip" type="application/octet-stream" sparkle:edSignature="JQ9lekGp6UAVxa9afdCof+iJG2I8v19EcVQgiegXEGuMuoVaT5B2BHQWvgVb0nE3XxcnWrBH2KpaFNm+KLCVDQ==" length="3895913"/>
     </item>
     <item>

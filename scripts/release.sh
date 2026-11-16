@@ -9,6 +9,9 @@
 # 4. published as a GitHub release (Slowburn-<version>.zip, plus Slowburn.zip for the installer's "latest");
 # 5. announced in docs/appcast.xml, which the app checks once a day.
 #
+# What's new goes in release-notes/<version>.en.md and .ru.md: a few "- " lines in plain words. The update
+# window shows them (in the Mac's language), and so does the GitHub release.
+#
 # Once per Mac, store the notarization password (an app-specific one from account.apple.com):
 #   xcrun notarytool store-credentials slowburn --apple-id <your Apple ID> --team-id D5WGUAD34M
 #
@@ -32,7 +35,8 @@ SPARKLE_BIN=".build/artifacts/sparkle/Sparkle/bin"
 say() { printf '\033[38;5;209m◔\033[0m %s\n' "$1"; }
 fail() { printf '\033[31m✗\033[0m %s\n' "$1" >&2; exit 1; }
 
-# --- Preflight: nothing gets published from a dirty or stale tree.
+# --- Preflight: nothing gets published from a dirty or stale tree, or without notes.
+python3 scripts/notes.py appcast "$VERSION" >/dev/null || fail "Write release-notes/$VERSION.en.md and release-notes/$VERSION.ru.md first."
 if [ -z "${SLOWBURN_DRY_RUN:-}" ]; then
   [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || fail "Release from main."
   [ -z "$(git status --porcelain)" ] || fail "Commit or stash your changes first."
@@ -78,9 +82,9 @@ say "Notarized: $ZIP"
 # --- Sparkle signature and the appcast entry.
 SIG="$("$SPARKLE_BIN/sign_update" --account slowburn "$ZIP")"   # sparkle:edSignature="…" length="…"
 URL="https://github.com/$REPO/releases/download/$TAG/Slowburn-$VERSION.zip"
-python3 - "$VERSION" "$BUILD" "$URL" "$SIG" <<'PY'
+python3 - "$VERSION" "$BUILD" "$URL" "$SIG" "$(python3 scripts/notes.py appcast "$VERSION")" <<'PY'
 import sys, re, email.utils, pathlib
-version, build, url, sig = sys.argv[1:]
+version, build, url, sig, notes = sys.argv[1:]
 path = pathlib.Path("docs/appcast.xml")
 item = f"""    <item>
       <title>Slowburn {version}</title>
@@ -88,7 +92,7 @@ item = f"""    <item>
       <sparkle:version>{build}</sparkle:version>
       <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://github.com/kdanet/slowburn/releases/tag/v{version}</sparkle:releaseNotesLink>
+{notes.rstrip()}
       <enclosure url="{url}" type="application/octet-stream" {sig.strip()}/>
     </item>
 """
@@ -106,10 +110,8 @@ fi
 say "Publishing $TAG on GitHub"
 git tag -a "$TAG" -m "Slowburn $VERSION"
 git push --quiet origin "$TAG"
-PREV="$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)"
-NOTES="$(git log --pretty='- %s' ${PREV:+$PREV..}"$TAG" | grep -v '^- Release ' || true)"
 gh release create "$TAG" "$ZIP" "$DIST/Slowburn.zip" --repo "$REPO" --title "Slowburn $VERSION" \
-  --notes "${NOTES:-Slowburn $VERSION}"
+  --notes "$(python3 scripts/notes.py github "$VERSION")"
 git add docs/appcast.xml
 git commit --quiet -m "Release $VERSION: appcast"
 git push --quiet origin main
