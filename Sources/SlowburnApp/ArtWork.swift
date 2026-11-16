@@ -80,8 +80,8 @@ extension Motion {
         atLaptop(t)
         // Slow, thoughtful pecking; eyes up on the idea.
         dy = base.dy - 0.5 * abs(sin(tau * t * 0.9))
-        lookX = 1.2 * sin(tau * t / 5)
-        lookY = -5
+        lookX = 2 + 1.2 * sin(tau * t / 5)
+        lookY = -3
         rot = -1 + base.rot * 0.4
     }
 
@@ -180,7 +180,6 @@ extension ActivityProps {
     }
 
     func drawDebugging(_ ctx: inout GraphicsContext) {
-        if layer == .held { sweat(&ctx) }
         if layer == .front {
             laptop(&ctx, dots: false)
             bug(&ctx)
@@ -239,16 +238,11 @@ extension ActivityProps {
     }
 
     private func magnifier(_ ctx: inout GraphicsContext) {
+        // A flat lens in the provider's colour sweeping the lid.
         let p = WorkTiming.lens(t)
-        let r: CGFloat = 11
-        var handle = Path(); handle.move(to: CGPoint(x: p.x + 8, y: p.y + 8)); handle.addLine(to: CGPoint(x: p.x + 17, y: p.y + 17))
-        ctx.stroke(handle, with: .color(WorkInk.handle), style: StrokeStyle(lineWidth: 5, lineCap: .round))
-        let lens = circle(p, r)
-        ctx.fill(lens, with: .color(PropInk.water.opacity(0.45)))
-        var glint = Path()
-        glint.addArc(center: p, radius: r - 4, startAngle: .degrees(200), endAngle: .degrees(260), clockwise: false)
-        ctx.stroke(glint, with: .color(Color.white.opacity(0.9)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-        ctx.stroke(lens, with: .color(WorkInk.handle), lineWidth: 3.2)
+        ctx.stroke(segment(CGPoint(x: p.x + 8, y: p.y + 8), CGPoint(x: p.x + 15, y: p.y + 15)), with: .color(tint),
+                   style: StrokeStyle(lineWidth: 5, lineCap: .round))
+        ctx.stroke(circle(p, 10), with: .color(tint), lineWidth: 3.4)
     }
 
     private func prompt(_ ctx: inout GraphicsContext) {
@@ -299,17 +293,9 @@ extension ActivityProps {
     }
 
     private func gears(_ ctx: inout GraphicsContext) {
-        // Two gears meshing up on the right: a big grey one driving a small one in the provider's colour.
-        let a = tau * t / 4
-        let dir = Double.pi / 4
-        let big = CGPoint(x: 90, y: -1), rBig: CGFloat = 13
-        let rSmall: CGFloat = 9.75
-        let small = CGPoint(x: big.x + (rBig + rSmall) * CGFloat(cos(dir)), y: big.y + (rBig + rSmall) * CGFloat(sin(dir)))
-        let b = -(a - dir) * 8 / 6 + dir + .pi + .pi / 6
-        ctx.fill(gear(at: small, pitch: rSmall, teeth: 6, angle: b), with: .color(tint), style: FillStyle(eoFill: true))
-        ctx.stroke(gear(at: small, pitch: rSmall, teeth: 6, angle: b), with: .color(PropInk.metalEdge), lineWidth: 1.6)
-        ctx.fill(gear(at: big, pitch: rBig, teeth: 8, angle: a), with: .color(PropInk.metal), style: FillStyle(eoFill: true))
-        ctx.stroke(gear(at: big, pitch: rBig, teeth: 8, angle: a), with: .color(PropInk.metalEdge), lineWidth: 1.6)
+        // One flat gear in the provider's colour, turning up on the right.
+        let g = gear(at: CGPoint(x: 98, y: 4), pitch: 13, teeth: 8, angle: tau * t / 4)
+        ctx.fill(g, with: .color(tint), style: FillStyle(eoFill: true))
     }
 
     private func gear(at c: CGPoint, pitch: CGFloat, teeth n: Int, angle: Double) -> Path {
@@ -330,15 +316,6 @@ extension ActivityProps {
     private func rocket(_ ctx: inout GraphicsContext) {
         let r = WorkTiming.rocket(t)
         let pad = CGPoint(x: 106, y: 97)
-        // Launch pad, and a puff of smoke while lifting off.
-        ctx.fill(Path(roundedRect: CGRect(x: 94, y: 97, width: 24, height: 4), cornerRadius: 2), with: .color(PropInk.metalEdge))
-        if r.lift > 0 {
-            let puff = min(r.lift / 60, 1)
-            for side in [CGFloat(-1), 0, 1] {
-                let c = CGPoint(x: pad.x + side * (5 + 9 * puff), y: pad.y - 3 - 5 * puff - (side == 0 ? 3 : 0))
-                ctx.fill(circle(c, 4 + 3 * puff), with: .color(PropInk.steam.opacity(0.75 * (1 - puff))))
-            }
-        }
         var c = ctx
         c.opacity = r.alpha
         let shake = r.lift == 0 ? 0.5 * sin(t * 60) : 0
@@ -371,29 +348,16 @@ extension ActivityProps {
     }
 
     private func globe(_ ctx: inout GraphicsContext) {
-        // A turning globe up on the right: meridians slide across, land drifts by.
-        let c = CGPoint(x: 103, y: 4), r: CGFloat = 14
+        // A line-drawn globe in the provider's colour; its meridians turn.
+        let c = CGPoint(x: 101, y: 4), r: CGFloat = 13
         let disc = circle(c, r)
-        ctx.fill(disc, with: .color(PropInk.water))
-        var inside = ctx
-        inside.clip(to: disc)
-        let spin = tau * t / 6
-        for (lon, lat, size) in [(0.0, -5.0, 7.0), (2.2, 5.0, 8.0), (4.1, -2.0, 6.5)] {
-            let a = lon + spin
-            guard cos(a) > -0.2 else { continue }
-            let x = c.x + r * 0.85 * CGFloat(sin(a))
-            let w = CGFloat(size) * CGFloat(max(cos(a), 0.15))
-            inside.fill(Path(ellipseIn: CGRect(x: x - w, y: c.y + CGFloat(lat) - CGFloat(size) * 0.6, width: 2 * w, height: CGFloat(size) * 1.2)),
-                        with: .color(PropInk.leaf))
-        }
-        let line = WorkInk.ocean
-        for k in 0..<3 {
-            let a = (spin + Double(k) * .pi / 3).truncatingRemainder(dividingBy: .pi)
+        for k in 0..<2 {
+            let a = (tau * t / 6 + Double(k) * .pi / 2).truncatingRemainder(dividingBy: .pi)
             let hw = r * CGFloat(abs(cos(a)))
-            inside.stroke(Path(ellipseIn: CGRect(x: c.x - hw, y: c.y - r, width: 2 * hw, height: 2 * r)), with: .color(line), lineWidth: 1.6)
+            ctx.stroke(Path(ellipseIn: CGRect(x: c.x - hw, y: c.y - r, width: 2 * hw, height: 2 * r)), with: .color(tint), lineWidth: 2)
         }
-        inside.stroke(segment(CGPoint(x: c.x - r, y: c.y), CGPoint(x: c.x + r, y: c.y)), with: .color(line), lineWidth: 1.6)
-        ctx.stroke(disc, with: .color(line), lineWidth: 2)
+        ctx.stroke(segment(CGPoint(x: c.x - r, y: c.y), CGPoint(x: c.x + r, y: c.y)), with: .color(tint), lineWidth: 2.2)
+        ctx.stroke(disc, with: .color(tint), lineWidth: 2.8)
     }
 
     private func helper(_ ctx: inout GraphicsContext) {
@@ -430,60 +394,31 @@ extension ActivityProps {
     }
 
     private func bulb(_ ctx: inout GraphicsContext) {
-        // A light bulb above the head that warms up and glows.
-        let glow = 0.5 + 0.5 * sin(tau * t / 1.8)
-        var ctx = ctx
-        ctx.translateBy(x: 50, y: 11)
-        ctx.scaleBy(x: 1.15, y: 1.15)
-        ctx.translateBy(x: -50, y: -5)
-        let c = CGPoint(x: 50, y: -12)
-        for f in [1.08, 1.3, 1.7, 1.92] {
-            let a = Double.pi * f
-            let d1 = 12.5 + CGFloat(glow), d2 = 15 + 2 * CGFloat(glow)
-            ctx.stroke(segment(CGPoint(x: c.x + d1 * CGFloat(cos(a)), y: c.y + d1 * CGFloat(sin(a))),
-                               CGPoint(x: c.x + d2 * CGFloat(cos(a)), y: c.y + d2 * CGFloat(sin(a)))),
-                       with: .color(star.opacity(0.4 + 0.6 * glow)), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+        // A thought bubble: three circles rising from the head, lighting up one after another.
+        let q = phase(t, 2.4)
+        for (i, (x, y, r)) in [(82.0, 16.0, 2.6), (90.0, 6.0, 4.0), (102.0, -8.0, 8.0)].enumerated() {
+            let k = bump((q - Double(i) * 0.18) / 0.45) * ((q - Double(i) * 0.18) > 0 && (q - Double(i) * 0.18) < 0.45 ? 1 : 0)
+            let rr = CGFloat(r) * (1 + 0.12 * CGFloat(k))
+            ctx.fill(circle(CGPoint(x: x, y: y), rr), with: .color(tint.opacity(0.55 + 0.45 * k)))
         }
-        var glass = Path()
-        glass.move(to: CGPoint(x: c.x - 5, y: c.y + 10))
-        glass.addCurve(to: CGPoint(x: c.x, y: c.y - 10), control1: CGPoint(x: c.x - 6, y: c.y + 3), control2: CGPoint(x: c.x - 12, y: c.y - 10))
-        glass.addCurve(to: CGPoint(x: c.x + 5, y: c.y + 10), control1: CGPoint(x: c.x + 12, y: c.y - 10), control2: CGPoint(x: c.x + 6, y: c.y + 3))
-        glass.closeSubpath()
-        ctx.fill(glass, with: .color(Color(hex: 0xFFF3C4)))
-        ctx.fill(glass, with: .color(PropInk.star.opacity(0.35 + 0.65 * glow)))
-        ctx.stroke(glass, with: .color(cord), lineWidth: 1.6)
-        var fil = Path()
-        fil.move(to: CGPoint(x: c.x - 3, y: c.y + 8)); fil.addLine(to: CGPoint(x: c.x - 3, y: c.y - 1))
-        fil.addLine(to: CGPoint(x: c.x, y: c.y + 2)); fil.addLine(to: CGPoint(x: c.x + 3, y: c.y - 1)); fil.addLine(to: CGPoint(x: c.x + 3, y: c.y + 8))
-        ctx.stroke(fil, with: .color(PropInk.fire.opacity(0.5 + 0.5 * glow)), style: StrokeStyle(lineWidth: 1.6, lineJoin: .round))
-        let cap = Path(roundedRect: CGRect(x: c.x - 5.5, y: c.y + 10, width: 11, height: 7), cornerRadius: 2)
-        ctx.fill(cap, with: .color(PropInk.metal))
-        ctx.stroke(cap, with: .color(PropInk.metalEdge), lineWidth: 1.6)
     }
 
     private func clipboard(_ ctx: inout GraphicsContext) {
-        // A clipboard on the right; the plan's lines get ticked one by one.
+        // A plan card on the right, like the code tiles; its lines get ticked one by one.
         var c = ctx
-        c.translateBy(x: 108, y: 44)
-        c.rotate(by: .degrees(6))
-        let board = Path(roundedRect: CGRect(x: -14, y: -21, width: 28, height: 42), cornerRadius: 3.5)
-        c.fill(board, with: .color(PropInk.wood))
-        c.stroke(board, with: .color(Color(hex: 0x6E4826)), lineWidth: 1.6)
-        c.fill(Path(roundedRect: CGRect(x: -11, y: -16, width: 22, height: 34), cornerRadius: 1.5), with: .color(PropInk.paper))
-        c.fill(Path(roundedRect: CGRect(x: -6, y: -24, width: 12, height: 7), cornerRadius: 2), with: .color(PropInk.metalEdge))
+        c.translateBy(x: 106, y: 40)
+        c.rotate(by: .degrees(5))
+        let card = Path(roundedRect: CGRect(x: -15, y: -18, width: 30, height: 36), cornerRadius: 6, style: .continuous)
+        c.fill(card, with: .color(WorkInk.screen))
+        c.stroke(card, with: .color(tint), lineWidth: 1.8)
         let q = phase(t, WorkTiming.planPeriod)
         for (i, at) in WorkTiming.planTicks.enumerated() {
-            let y = CGFloat(-8 + 10 * i)
-            c.stroke(Path(CGRect(x: -8, y: y - 3, width: 6, height: 6)), with: .color(PropInk.metalEdge), lineWidth: 1.4)
-            c.stroke(segment(CGPoint(x: 1, y: y), CGPoint(x: 8, y: y)), with: .color(PropInk.steam), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-            let k = (q - at) / 0.08
-            guard k > 0, q < 0.94 else { continue }
-            let s = CGFloat(min(k, 1))
-            var tick = Path()
-            tick.move(to: CGPoint(x: -8, y: y - 0.5))
-            tick.addLine(to: CGPoint(x: -5.5, y: y + 2.5))
-            tick.addLine(to: CGPoint(x: -5.5 + 7 * s, y: y + 2.5 - 9 * s))
-            c.stroke(tick, with: .color(WorkInk.passDeep), style: StrokeStyle(lineWidth: 2.4, lineCap: .round, lineJoin: .round))
+            let y = CGFloat(-9 + 9 * i)
+            let done = q > at && q < 0.94
+            c.stroke(circle(CGPoint(x: -7, y: y), 2.6), with: .color(tint), lineWidth: 1.6)
+            if done { c.fill(circle(CGPoint(x: -7, y: y), 2.6), with: .color(tint)) }
+            c.stroke(segment(CGPoint(x: -1, y: y), CGPoint(x: 9, y: y)), with: .color(tint.opacity(done ? 0.45 : 0.9)),
+                     style: StrokeStyle(lineWidth: 2, lineCap: .round))
         }
     }
 
@@ -514,23 +449,6 @@ extension ActivityProps {
         for (x, y) in [(-3.0, -2.6), (-3.0, 2.6), (1.5, -2.8), (1.5, 2.8)] {
             c.fill(circle(CGPoint(x: x, y: y), 1.3), with: .color(ink))
         }
-    }
-
-    private func sweat(_ ctx: inout GraphicsContext) {
-        // A bead of sweat that slides down the side of the head and comes back.
-        let q = phase(t, 2.6)
-        let p = CGPoint(x: 84 + 2 * CGFloat(q), y: 22 + 14 * CGFloat(smooth(q)))
-        let alpha = min(q / 0.15, 1) * min((1 - q) / 0.2, 1)
-        var ctx = ctx
-        ctx.translateBy(x: p.x, y: p.y); ctx.scaleBy(x: 1.6, y: 1.6); ctx.translateBy(x: -p.x, y: -p.y)
-        var drop = Path()
-        drop.move(to: CGPoint(x: p.x, y: p.y - 6))
-        drop.addQuadCurve(to: CGPoint(x: p.x + 3.6, y: p.y + 1.6), control: CGPoint(x: p.x + 3.4, y: p.y - 2))
-        drop.addArc(center: CGPoint(x: p.x, y: p.y + 1.6), radius: 3.6, startAngle: .degrees(0), endAngle: .degrees(180), clockwise: false)
-        drop.addQuadCurve(to: CGPoint(x: p.x, y: p.y - 6), control: CGPoint(x: p.x - 3.4, y: p.y - 2))
-        ctx.fill(drop, with: .color(PropInk.water.opacity(alpha)))
-        ctx.stroke(drop, with: .color(WorkInk.ocean.opacity(alpha)), lineWidth: 1.2)
-        ctx.fill(circle(CGPoint(x: p.x - 1.2, y: p.y + 1), 1), with: .color(Color.white.opacity(0.9 * alpha)))
     }
 
     private func question(_ ctx: inout GraphicsContext) {
