@@ -169,8 +169,6 @@ struct SmartLayout: View {
     var onBoost: ((Provider, Int) -> Void)? = nil
     /// The reserve's checkbox: (provider, on) — the 5-hour limit takes from the reserve on its own.
     var onAutoReserve: ((Provider, Bool) -> Void)? = nil
-    /// The 5-hour bar under the pointer: it shows when it clears instead of just the percentage.
-    @State private var hoveredFiveHour: Provider?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -355,8 +353,8 @@ struct SmartLayout: View {
         }
         if let clear = main.fiveHourClearsAt { help += L(" Полностью обнулится к \(Phrases.time(clear)).", " Fully clear by \(Phrases.time(clear)).") }
 
-        // Under the pointer: when the rolling 5 hours empty out, if nothing more is spent.
-        let clears = hoveredFiveHour == main.provider ? main.fiveHourClearsAt : nil
+        // When the rolling 5 hours empty out if nothing more is spent. Over the norm, "until" says more.
+        let clears = over ? nil : main.fiveHourClearsAt
         func number(_ ink: Color) -> some View {
             HStack(spacing: 5) {
                 // Over everything: when it opens again, right next to the number.
@@ -364,11 +362,14 @@ struct SmartLayout: View {
                     Text(L("до \(Phrases.time(free)) ·", "until \(Phrases.time(free)) ·")).font(.system(size: 12.5, weight: .medium)).opacity(0.75)
                 }
                 if let clears {
-                    Text(L("сброс к \(Phrases.time(clears))", "clears by \(Phrases.time(clears))"))
-                        .font(.system(size: 12.5, weight: .medium)).opacity(0.75)
-                    if !over { Text("·").font(.system(size: 12.5, weight: .medium)).opacity(0.75) }
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.counterclockwise").font(.system(size: 10.5, weight: .bold))
+                        Text(Phrases.time(clears))
+                    }
+                    .font(.system(size: 12.5, weight: .medium)).opacity(0.75)
+                    .padding(.trailing, 3)
                 }
-                if clears == nil || !over { Text("\(Int((spent / norm * 100).rounded()))%") }
+                Text("\(Int((spent / norm * 100).rounded()))%")
             }
             .font(.system(size: 13.5, weight: .semibold))
             .monospacedDigit()
@@ -408,11 +409,6 @@ struct SmartLayout: View {
                     }
                 } value: {
                     EmptyView()
-                }
-                .onHover { inside in
-                    withAnimation(.easeOut(duration: 0.15)) {
-                        if inside { hoveredFiveHour = main.provider } else if hoveredFiveHour == main.provider { hoveredFiveHour = nil }
-                    }
                 }
                 if boosted {
                     // The top-up as its own small bar: fills once the norm is used up; click gives it back.
