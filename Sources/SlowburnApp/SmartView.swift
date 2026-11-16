@@ -246,8 +246,14 @@ struct SmartLayout: View {
 
     /// Name, the traffic-light phrase as the card's title, when the week resets — and the blob, big.
     private func header(blob: BlobModel, status: Status, main: LimitRow, window: LimitRow?) -> some View {
+        // Both resets on one line: the rolling 5 hours (when they empty out if nothing more is spent), then the week.
         var sub = L("Сброс недели \(Phrases.time(main.resetsAt))", "Week resets \(Phrases.time(main.resetsAt))")
-        if let w = window, w.used < 50 { sub += L(" · окно \(main.provider.company) \(Int(w.used.rounded()))%", " · \(main.provider.company) window \(Int(w.used.rounded()))%") }
+        if let clears = main.fiveHourClearsAt {
+            sub = L("Сброс 5 ч в \(Phrases.time(clears)) · недели \(Phrases.time(main.resetsAt))",
+                    "5 h reset \(Phrases.time(clears)) · week \(Phrases.time(main.resetsAt))")
+        }
+        // The provider's own window while it is low; a busy 5-hour reset takes its place (one line only).
+        if let w = window, w.used < 50, main.fiveHourClearsAt == nil { sub += L(" · окно \(main.provider.company) \(Int(w.used.rounded()))%", " · \(main.provider.company) window \(Int(w.used.rounded()))%") }
         return HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -353,21 +359,11 @@ struct SmartLayout: View {
         }
         if let clear = main.fiveHourClearsAt { help += L(" Полностью обнулится к \(Phrases.time(clear)).", " Fully clear by \(Phrases.time(clear)).") }
 
-        // When the rolling 5 hours empty out if nothing more is spent. Over the norm, "until" says more.
-        let clears = over ? nil : main.fiveHourClearsAt
         func number(_ ink: Color) -> some View {
             HStack(spacing: 5) {
                 // Over everything: when it opens again, right next to the number.
                 if over, let free = main.fiveHourFreesAt {
                     Text(L("до \(Phrases.time(free)) ·", "until \(Phrases.time(free)) ·")).font(.system(size: 12.5, weight: .medium)).opacity(0.75)
-                }
-                if let clears {
-                    HStack(spacing: 3) {
-                        Image(systemName: "arrow.counterclockwise").font(.system(size: 10.5, weight: .bold))
-                        Text(Phrases.time(clears))
-                    }
-                    .font(.system(size: 12.5, weight: .medium)).opacity(0.75)
-                    .padding(.trailing, 3)
                 }
                 Text("\(Int((spent / norm * 100).rounded()))%")
             }
