@@ -220,17 +220,17 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <section id="install"><div class="wrap">
   <div class="install reveal">
     <p class="kicker">Install</p>
-    <h2>One line. About two minutes.</h2>
-    <p class="sub" style="margin:0 auto">It builds Slowburn on your Mac from source — nothing prebuilt is downloaded — drops it into your menu bar and starts it at login.</p>
+    <h2>One line. Ten seconds.</h2>
+    <p class="sub" style="margin:0 auto">It puts the latest Slowburn — signed and notarized by Apple — into your menu bar and starts it at login. After that it updates itself.</p>
     <div class="cmd"><code id="cmd">curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh</code><button id="copy">Copy</button></div>
-    <p class="fine">Needs macOS 14+ and Swift 6 — Xcode 16+ or its Command Line Tools (<code>xcode-select --install</code>). <a href="install.sh">Read the script</a> · <a href="https://github.com/kdanet/slowburn">Source on GitHub</a> · Uninstall: add <code>-s -- --uninstall</code> after <code>sh</code></p>
+    <p class="fine">Needs macOS 14+. <a href="https://github.com/kdanet/slowburn/releases/latest">Download the .zip</a> instead · <a href="install.sh">Read the script</a> · <a href="https://github.com/kdanet/slowburn">Source on GitHub</a> · Build it yourself: add <code>-s -- --from-source</code> after <code>sh</code> · Uninstall: <code>-s -- --uninstall</code></p>
   </div>
 </div></section>
 
 <section style="padding-top:20px"><div class="wrap" style="max-width:820px">
   <p class="kicker">FAQ</p><h2 style="font-size:36px">Questions vibe coders ask</h2>
   <details><summary>Will it slow me down?</summary><p>Only when you're about to spend tomorrow's limit today — and even then it asks. Most of the time it just shows your runway. Deadline day? Flip the big switch and everything is let through.</p></details>
-  <details><summary>Does it send my code or data anywhere?</summary><p>No. Slowburn asks the same usage endpoints the official CLIs use, with the access Claude Code and Codex already have on your Mac — read-only. It never stores or refreshes a token itself and needs no token of its own. Session logs are read locally. No analytics, no AI calls.</p></details>
+  <details><summary>Does it send my code or data anywhere?</summary><p>No. Slowburn asks the same usage endpoints the official CLIs use, with the access Claude Code and Codex already have on your Mac — read-only. It never stores or refreshes a token itself and needs no token of its own. Session logs are read locally. The only other request is a daily look at this site for updates. No analytics, no AI calls.</p></details>
   <details><summary>What happens if Slowburn isn't running?</summary><p>The hooks let everything through. Nothing can be held without the app there to release it.</p></details>
   <details><summary>Which plans does it work with?</summary><p>Claude Pro and Max used through Claude Code or the Claude app, and ChatGPT plans used through Codex. Codex credits are tracked too, so you see when work starts costing money.</p></details>
   <details><summary>Is it official?</summary><p>No — Slowburn is an independent, MIT-licensed open-source project. Not affiliated with Anthropic or OpenAI.</p></details>

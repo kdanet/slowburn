@@ -49,7 +49,9 @@
 curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh
 ```
 
-Скрипт собирает приложение из исходников на твоём Mac, кладёт `Slowburn.app` в `~/Applications`, включает запуск при входе и открывает его. Удалить: `curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh -s -- --uninstall`.
+Скрипт кладёт в `~/Applications` последний релиз `Slowburn.app` — подписанный и нотаризованный Apple, — включает запуск при входе и открывает его. Дальше приложение обновляется само (Sparkle; «Проверить обновления…» — в меню шестерёнки). Собрать из исходников: `… | sh -s -- --from-source`. Удалить: `curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh -s -- --uninstall`.
+
+Релиз: `scripts/release.sh 1.2.3` — универсальная сборка, подпись Developer ID, нотаризация, релиз на GitHub и запись в appcast.
 
 ## Команды
 

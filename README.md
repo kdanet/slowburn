@@ -17,7 +17,13 @@
 curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh
 ```
 
-The script builds Slowburn from source on your Mac (nothing prebuilt is downloaded), puts `Slowburn.app` in `~/Applications`, starts it, and starts it again at login. Run it again to update. It needs macOS 14+, git and Swift 6 — Xcode 16 or later, or its Command Line Tools (`xcode-select --install`).
+The script puts the latest release of `Slowburn.app` — signed and notarized by Apple — in `~/Applications`, starts it, and starts it again at login. After that the app updates itself (Sparkle; *Check for Updates…* is in the gear menu). Needs macOS 14+. You can also [download the .zip](https://github.com/kdanet/slowburn/releases/latest) yourself.
+
+To build it on your Mac instead (needs git and Swift 6 — Xcode 16 or later, or its Command Line Tools):
+
+```sh
+curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh -s -- --from-source
+```
 
 Optional — the soft brake for Claude Code and Codex:
 
@@ -47,6 +53,7 @@ Everything runs on your Mac. No account, no analytics, no AI calls.
 - **Claude:** the usage endpoint the official CLI uses, with the Claude Code CLI's own access token from the Keychain — read-only, and never refreshed by Slowburn so the CLI is never logged out. When that token has expired, Slowburn runs `claude -p /usage` (a local command, no model call, no cost), which lets the CLI refresh its own token. No separate token is needed.
 - **Codex:** `chatgpt.com/backend-api/wham/usage` with the token from `~/.codex/auth.json` (read-only), plus the session logs Codex writes in `~/.codex/sessions`.
 - **What agents are doing:** the tail of the session logs in `~/.claude/projects` and `~/.codex/sessions`.
+- **Updates:** once a day the app reads `kdanet.github.io/slowburn/appcast.xml`; updates are signed with the project's EdDSA key and notarized.
 
 Slowburn keeps its own files in `~/Library/Application Support/Slowburn/` (`SLOWBURN_HOME` overrides it).
 
@@ -76,6 +83,8 @@ swift build
 .build/debug/Slowburn &            # the menu bar app
 SLOWBURN_LANG=ru swift test        # tests check the Russian strings
 ```
+
+Releases: `scripts/release.sh 1.2.3` builds a universal app, signs it with a Developer ID, notarizes and staples it, publishes a GitHub release and adds it to the appcast (see the script's header for the one-time setup).
 
 Rendering helpers for docs: `--snapshot out`, `--moods out.png`, `--activities out.png [names]`, `--export-ui dir`, `--export-clip out.mp4 popover|blob:<activity>:<claude|codex>`, `--export-icons dir`.
 
