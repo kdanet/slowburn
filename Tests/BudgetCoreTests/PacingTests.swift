@@ -193,3 +193,54 @@ private func noAdvance() -> PaceSettings {
     // Nothing left for "+" to add.
     #expect(Pacer.boostStep(norm: 2, battery: 3, boost: .greatestFiniteMagnitude) == 0)
 }
+
+// MARK: - Filling in between whole-percent readings
+
+/// One unit of local spending per hour, every hour since t0; the week ticks up a percent every 10 units.
+private func steadyCurve(until h: Double) -> SpendCurve {
+    SpendCurve(buckets: (0..<Int(h.rounded(.up))).map { i in
+        SpendCurve.Bucket(start: hours(Double(i)), length: min(3600, (h - Double(i)) * 3600), amount: 1)
+    })
+}
+
+@Test func curveSpreadsBucketsAndMeasuresRateOnSteps() {
+    let curve = steadyCurve(until: 30)
+    #expect(abs(curve.amount(from: hours(0.5), to: hours(2)) - 1.5) < 1e-9)
+    let history = [UsagePoint(at: hours(0), used: 0), UsagePoint(at: hours(10), used: 1),
+                   UsagePoint(at: hours(20), used: 2), UsagePoint(at: hours(30), used: 3)]
+    #expect(abs((curve.rate(history: history) ?? 0) - 0.1) < 1e-9)
+    #expect(curve.rate(history: Array(history.prefix(2))) == nil) // one step is not enough to measure
+}
+
+@Test func fiveHourSpendingMovesBetweenWholePercentReadings() throws {
+    let settings = noAdvance()
+    let plan = PacePlan.start(from: weekly(used: 0, at: t0), now: t0, settings: settings)
+    let history = [UsagePoint(at: hours(0), used: 0), UsagePoint(at: hours(10), used: 1),
+                   UsagePoint(at: hours(20), used: 2), UsagePoint(at: hours(30), used: 3)]
+    // By readings alone the last 5 hours (29h–34h) spent a whole percent: the tick at 30h.
+    let now = hours(34)
+    let plain = Pacer.evaluate(snapshot: weekly(used: 3, at: now), plan: plan, history: history,
+                               settings: settings, now: now)
+    #expect(plain.spentLast5h == 1)
+    let s = Pacer.evaluate(snapshot: weekly(used: 3, at: now), plan: plan, history: history,
+                           settings: settings, now: now, curve: steadyCurve(until: 34))
+    #expect(abs((s.spentLast5h ?? 0) - 0.5) < 1e-9) // 5 hours at 0.1 an hour
+    // Over a cap of 0.3, it is free again once two of those hours have rolled off.
+    let tight = Pacer.evaluate(snapshot: weekly(used: 3, at: now), plan: plan, history: history,
+                               settings: settings, now: now, curve: steadyCurve(until: 34))
+    let frees = Pacer.modelRelease({ at in 0.1 * steadyCurve(until: 34).amount(from: at.addingTimeInterval(-5 * 3600), to: now) },
+                                   limit: 0.3, now: now)
+    #expect(abs(try #require(frees).timeIntervalSince(hours(36))) < 2)
+    #expect(tight.fiveHourClearsAt.map { abs($0.timeIntervalSince(hours(39))) < 2 } == true)
+}
+
+@Test func localCurveNeverStraysMoreThanAStepFromTheReadings() {
+    let settings = noAdvance()
+    let plan = PacePlan.start(from: weekly(used: 0, at: t0), now: t0, settings: settings)
+    // Readings jumped by 3 in the last 5 hours (spent elsewhere) while the curve saw only 0.5.
+    let history = [UsagePoint(at: hours(0), used: 0), UsagePoint(at: hours(10), used: 1),
+                   UsagePoint(at: hours(20), used: 2), UsagePoint(at: hours(29), used: 3), UsagePoint(at: hours(31), used: 6)]
+    let s = Pacer.evaluate(snapshot: weekly(used: 6, at: hours(34)), plan: plan, history: history,
+                           settings: settings, now: hours(34), curve: steadyCurve(until: 34))
+    #expect(abs((s.spentLast5h ?? 0) - 2) < 1e-9) // the 3 of the readings, less one step at most
+}

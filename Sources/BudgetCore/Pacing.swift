@@ -150,6 +150,19 @@ public enum Pacer {
         return at > now ? at : nil
     }
 
+    /// With no more spending, the first moment `spentBy(T)` — what the 5 hours ending at T hold — is within `limit`.
+    /// nil when it already is. `spentBy` only falls as T moves on, so halving finds the moment to the second.
+    static func modelRelease(_ spentBy: (Date) -> Double, limit: Double, now: Date,
+                             window: TimeInterval = 5 * 3600) -> Date? {
+        guard spentBy(now) > limit + 1e-9 else { return nil }
+        var lo = 0.0, hi = window
+        while hi - lo > 1 {
+            let mid = (lo + hi) / 2
+            if spentBy(now.addingTimeInterval(mid)) > limit + 1e-9 { lo = mid } else { hi = mid }
+        }
+        return now.addingTimeInterval(hi)
+    }
+
     /// One press of "+": one more norm, or what is left of the savings if that is less.
     public static func boostStep(norm: Double, battery: Double, boost: Double) -> Double {
         Swift.max(0, Swift.min(norm, Swift.max(0, battery) - Swift.max(0, boost)))
@@ -175,7 +188,7 @@ public enum Pacer {
 
     public static func evaluate(snapshot s: Snapshot, plan: PacePlan?, history: [UsagePoint],
                                 settings: PaceSettings, now: Date, fiveHourBoost: Double = 0,
-                                boostUntil: Date? = nil) -> PoolStatus {
+                                boostUntil: Date? = nil, curve: SpendCurve? = nil) -> PoolStatus {
         let current = UsagePoint(at: Swift.max(s.observedAt, history.map(\.at).max() ?? s.observedAt), used: s.usedPercent)
         let freshness = Freshness.of(s.observedAt, now: now, staleAfter: settings.staleAfter)
         var status = PoolStatus(snapshot: s, freshness: freshness, level: .green, correctionDetected: false, reasons: [])
@@ -204,10 +217,26 @@ public enum Pacer {
             let b5 = plan.fiveHourBudget
             // The plan's ledger starts at t0: spending before we started watching is not charged to it.
             let since = Swift.max(now.addingTimeInterval(-5 * 3600), plan.t0)
-            let spent5h = since == plan.t0 ? consumed
+            var spent5h = since == plan.t0 ? consumed
                 : spent(history: history, current: s.usedPercent, since: since,
                         // No reading that old: count from the earliest one we have, never from the plan start.
                         fallback: history.min(by: { $0.at < $1.at })?.used ?? s.usedPercent)
+            // Readings in whole percent move the 5-hour figure in jumps of a third of its norm. Where a finer
+            // local measure covers the 5 hours, it says how much went in between — kept within a step of
+            // what the readings say, since it can miss spending elsewhere (claude.ai, another Mac).
+            var model: ((Date) -> Double)?
+            if let curve, let rate = curve.rate(history: history + [current]),
+               let covered = curve.coveredFrom, covered <= since {
+                let raw = rate * curve.amount(from: since, to: now)
+                let refined = raw.clamped(Swift.max(0, spent5h - s.precision), spent5h + s.precision)
+                if raw > 0 {
+                    let scale = refined / raw
+                    model = { at in
+                        scale * rate * curve.amount(from: Swift.max(at.addingTimeInterval(-5 * 3600), plan.t0), to: now)
+                    }
+                }
+                spent5h = refined
+            }
             status.plan = plan
             status.earned = earned
             status.consumed = consumed
@@ -224,7 +253,8 @@ public enum Pacer {
             if spent5h > 0 {
                 let points = history + [current]
                 func release(_ limit: Double) -> Date? {
-                    rollingRelease(history: points, current: s.usedPercent, limit: limit, t0: plan.t0, now: now)
+                    if let model { return modelRelease(model, limit: limit, now: now) }
+                    return rollingRelease(history: points, current: s.usedPercent, limit: limit, t0: plan.t0, now: now)
                 }
                 var frees = spent5h > cap ? release(cap) : nil
                 // The hand-added part ends first: from then on only the norm counts.

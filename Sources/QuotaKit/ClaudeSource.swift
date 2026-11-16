@@ -347,6 +347,36 @@ public struct ClaudeTokenLedger: Codable, Sendable {
         return out
     }
 
+    /// Claude Code's spending as a curve for one weekly pool: tokens weighted by their price relative to each other
+    /// (a cache read costs a tenth of fresh input, output five times it; Haiku and Sonnet cost less than Opus).
+    /// Only rough proportions are needed — the curve is scaled to the pool's own readings. A pool scoped to a model
+    /// (`seven_day_opus`, `seven_day_fable`) counts only that model.
+    public func curve(for pool: PoolKey, now: Date) -> SpendCurve? {
+        guard pool.provider == .claude, pool.id.hasPrefix("seven_day") else { return nil }
+        let scope = pool.id.dropFirst("seven_day".count).drop(while: { $0 == "_" }).lowercased()
+        guard scope.isEmpty || ["opus", "sonnet", "haiku", "fable"].contains(scope) else { return nil }
+        var buckets: [SpendCurve.Bucket] = []
+        for (hour, models) in hours {
+            var amount = 0.0
+            for (model, c) in models where scope.isEmpty || model.lowercased().contains(scope) {
+                amount += Self.weight(model) * (Double(c.input) + 1.25 * Double(c.cacheWrite)
+                                                + 0.1 * Double(c.cacheRead) + 5 * Double(c.output))
+            }
+            let start = Date(timeIntervalSince1970: TimeInterval(hour))
+            // The hour still going on holds only what was spent up to now.
+            let length = Swift.min(3600, Swift.max(60, now.timeIntervalSince(start)))
+            buckets.append(SpendCurve.Bucket(start: start, length: length, amount: amount))
+        }
+        return buckets.isEmpty ? nil : SpendCurve(buckets: buckets)
+    }
+
+    static func weight(_ model: String) -> Double {
+        let m = model.lowercased()
+        if m.contains("haiku") { return 0.2 }
+        if m.contains("sonnet") { return 0.6 }
+        return 1
+    }
+
     public static func update(paths: Paths, reader: inout IncrementalReader, now: Date) -> ClaudeTokenLedger {
         var ledger = JSONFile.load(ClaudeTokenLedger.self, from: paths.claudeTokens) ?? ClaudeTokenLedger()
         for file in recentFiles(under: paths.claudeProjects, ext: "jsonl", modifiedWithin: 86400, now: now) {

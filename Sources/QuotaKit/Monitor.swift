@@ -164,7 +164,8 @@ public final class Monitor: @unchecked Sendable {
             var status = Pacer.evaluate(snapshot: s, plan: plan, history: history.points[key] ?? [],
                                         settings: poolSettings, now: now,
                                         fiveHourBoost: auto ? .greatestFiniteMagnitude : Boosts.total(s.pool.provider, paths: paths, now: now),
-                                        boostUntil: auto ? nil : Boosts.until(s.pool.provider, paths: paths, now: now))
+                                        boostUntil: auto ? nil : Boosts.until(s.pool.provider, paths: paths, now: now),
+                                        curve: tokens.curve(for: s.pool, now: now))
             if auto { status.fiveHourAuto = true }
             if s.isLongWindow, now < s.resetsAt {
                 status.smart = Smart.compute(snapshot: s, plan: plan, history: history.points[key] ?? [], now: now)
