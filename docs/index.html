@@ -92,33 +92,15 @@ h2{font-size:clamp(32px,4.2vw,50px);letter-spacing:-.035em;line-height:1.05;marg
 .notes li b{color:var(--text);font-weight:600}
 .dot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:9px}
 
-/* companions */
-.blobs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.blob{position:relative;background:#221E1B;border:1px solid var(--line);border-radius:18px;overflow:hidden;transition:transform .25s,border-color .25s}
-.blob:hover{transform:translateY(-4px);border-color:var(--line2)}
-.blob video{width:100%;aspect-ratio:240/220;object-fit:cover}
-.blob .lab{position:absolute;left:10px;right:10px;bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12.5px}
-.blob .lab b{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;padding:2px 8px;border-radius:999px;flex:none}
-.blob .lab b.w{background:var(--soft);color:var(--orange)}.blob .lab b.r{background:rgba(156,152,255,.15);color:var(--codex)}
-.blob .lab span{color:var(--muted);text-align:right}
 
 /* install */
 .install{background:radial-gradient(80% 120% at 50% 0%,rgba(255,138,87,.14),transparent 70%),var(--card);border:1px solid var(--line);border-radius:28px;padding:48px 36px;text-align:center}
-.cmd{display:flex;align-items:center;gap:12px;max-width:720px;margin:28px auto 14px;background:#0b0a09;border:1px solid var(--line2);border-radius:14px;padding:6px 6px 6px 18px;text-align:left}
-.cmd code{flex:1;font-size:14.5px;white-space:nowrap;overflow-x:auto;color:#efe7df;padding:10px 0}
-.cmd code::before{content:"$ ";color:var(--dim)}
-.cmd button{border:0;background:var(--orange);color:#1a1a1a;font-weight:650;font-size:14px;font-family:inherit;padding:10px 16px;border-radius:10px;cursor:pointer;flex:none}
-.install .fine a{color:var(--muted)}
-.or{display:flex;align-items:center;gap:14px;max-width:720px;margin:26px auto;color:var(--dim);font-size:13px;text-transform:uppercase;letter-spacing:.08em}
-.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
-.release{display:flex;align-items:center;justify-content:space-between;gap:20px;max-width:720px;margin:0 auto;text-align:left;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:18px;padding:18px 18px 18px 22px}
-.release .ver{font-weight:650;font-size:17px}
-.release .meta{color:var(--dim);font-size:13.5px;margin-top:2px}
-.release .meta a{color:var(--muted)}
-.release ul{margin:10px 0 0;padding-left:18px;color:var(--muted);font-size:14px}
-.release ul:empty{display:none}
-.release li+li{margin-top:4px}
-.release .btn{flex:none}
+.mac{display:inline-flex;align-items:center;gap:14px;margin-top:30px;padding:18px 34px 18px 28px;border-radius:999px;background:var(--orange);color:#1a1a1a;text-decoration:none;font-weight:700;font-size:19px;letter-spacing:-.01em;box-shadow:0 12px 44px rgba(255,138,87,.38),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .15s,background .15s,box-shadow .2s}
+.mac:hover{background:#ff9d70;transform:translateY(-2px);box-shadow:0 16px 54px rgba(255,138,87,.55),inset 0 1px 0 rgba(255,255,255,.35)}
+.mac:active{transform:scale(.97)}
+.mac svg{width:26px;height:26px;fill:currentColor;margin-top:-3px;flex:none}
+.install .meta{margin-top:18px;color:var(--dim);font-size:14px}
+.install .meta a{color:var(--muted)}
 
 details{border-bottom:1px solid var(--line);padding:18px 0}
 summary{cursor:pointer;font-weight:650;font-size:17px;list-style:none;display:flex;justify-content:space-between;gap:16px}
@@ -137,20 +119,15 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 @media (max-width:980px){
   .hero .top,.row{grid-template-columns:minmax(0,1fr);gap:40px}
   .row.flip>.shot{order:0}
-  .blobs{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (max-width:600px){
   .wrap{padding:0 16px}
   .navr a.hide{display:none}
   section{padding:72px 0}
-  .blobs{grid-template-columns:repeat(2,minmax(0,1fr))}
   .panel{height:520px}
   .shot{padding:22px 14px}
   .install{padding:36px 18px}
-  .cmd{flex-direction:column;align-items:stretch;padding:10px}
-  .cmd code{font-size:12px;white-space:normal;word-break:break-all;padding:4px 0}
-  .release{flex-direction:column;align-items:stretch;padding:18px}
-  .release .btn{justify-content:center}
+  .mac{display:flex;justify-content:center;padding:17px 22px;font-size:18px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal,.shot.reveal img,.shot.reveal .glass{opacity:1;transform:none}}
 </style>
@@ -160,7 +137,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <nav><div class="wrap">
   <a class="brand" href="#"><img src="assets/icon.svg" alt="">Slowburn</a>
   <div class="navr">
-    <a class="hide" href="#features">Features</a><a class="hide" href="#companions">Companions</a><a class="hide" href="#install">Install</a>
+    <a class="hide" href="#features">Features</a><a class="hide" href="#install">Download</a>
     <a class="star" href="https://github.com/kdanet/slowburn"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>Star</a>
   </div>
 </div></nav>
@@ -172,7 +149,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       <h1>Burn your AI limits <em>slowly.</em></h1>
       <p class="lead">Slowburn lives in your menu bar and <b>paces your Claude Code and Codex limits</b> so they last all week. One glance tells you how much runway you have — and when an agent is about to burn tomorrow's budget, you get to decide.</p>
       <div class="cta"><a class="btn primary" href="#install">Get Slowburn — free</a><a class="btn ghost" href="#features">See how it works</a></div>
-      <p class="fine">Open source · macOS 14+ · one-line install · no account, no telemetry</p>
+      <p class="fine">Open source · macOS 14+ · no account, no telemetry</p>
     </div>
     <div class="drop">
       <div class="mbar" role="img" aria-label="The Slowburn ring in the macOS menu bar, selected">
@@ -224,27 +201,12 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   <div class="shot reveal"><img src="assets/ui/switch.png" alt="The limits card at the top of the Slowburn panel: Limits on, with Pause for 30 min below the switch"></div>
 </div></section>
 
-<section id="companions" class="alt"><div class="wrap">
-  <div class="center reveal"><p class="kicker">Companions</p><h2>Your agents finally have a face.</h2><p class="sub">Orange is Claude, violet is Codex. While an agent works, its blob sits at the laptop doing exactly what the agent does — read live from the session log. Between tasks it fishes, naps or roasts marshmallows. Forty pastimes in all.</p></div>
-  <div class="blobs reveal" id="blobs"></div>
-</div></section>
-
 <section id="install"><div class="wrap">
   <div class="install reveal">
-    <p class="kicker">Install</p>
-    <h2>One line. Ten seconds.</h2>
-    <p class="sub" style="margin:0 auto">It puts the latest Slowburn — signed and notarized by Apple — into your menu bar and starts it at login. After that it updates itself.</p>
-    <div class="cmd"><code id="cmd">curl -fsSL https://kdanet.github.io/slowburn/install.sh | sh</code><button id="copy">Copy</button></div>
-    <div class="or">or download it</div>
-    <div class="release">
-      <div>
-        <div class="ver" id="rel-ver">The latest release</div>
-        <div class="meta"><span id="rel-date">Signed and notarized by Apple</span> · <a id="rel-link" href="https://github.com/kdanet/slowburn/releases/latest">Release notes</a></div>
-        <ul id="rel-notes"></ul>
-      </div>
-      <a class="btn primary" href="https://github.com/kdanet/slowburn/releases/latest/download/Slowburn.zip">Download .zip</a>
-    </div>
-    <p class="fine">Needs macOS 14+. Unzip and move Slowburn to Applications. · <a href="install.sh">Read the script</a> · <a href="https://github.com/kdanet/slowburn">Source on GitHub</a> · Uninstall: <code>-s -- --uninstall</code> after <code>sh</code></p>
+    <p class="kicker">Download</p>
+    <h2>Slowburn for your Mac.</h2>
+    <a class="mac" href="https://github.com/kdanet/slowburn/releases/latest/download/Slowburn.zip"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>Download for macOS</a>
+    <p class="meta"><span id="rel-meta">macOS 14+ · signed and notarized by Apple</span> · <a id="rel-link" href="https://github.com/kdanet/slowburn/releases/latest">What's new</a></p>
   </div>
 </div></section>
 
@@ -260,53 +222,26 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <footer><div class="wrap"><span>Slowburn · MIT · <a href="https://github.com/kdanet/slowburn">github.com/kdanet/slowburn</a></span><span>Not affiliated with Anthropic or OpenAI. Claude and Codex are trademarks of their owners.</span></div></footer>
 
 <script>
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = id => document.getElementById(id);
 const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12 });
 document.querySelectorAll('.reveal').forEach(n => io.observe(n));
-function whenVisible(node, on, off) { new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? on() : off && off()), { threshold: .2 }).observe(node); }
 
-(function companions() {
-  const list = [['coding','w','editing code'],['testing','w','running tests'],['thinking','w','thinking'],['debugging','w','fixing a failed step'],
-    ['shipping','w','pushing a release'],['browsing','w','searching the web'],['fishing','r','fishing'],['music','r','listening to music'],
-    ['campfire','r','roasting marshmallows'],['hammock','r','napping'],['painting','r','painting'],['kite','r','flying a kite']];
-  const host = $('blobs');
-  host.innerHTML = list.map(([a, k, l]) => `<div class="blob"><video src="assets/video/${a}.mp4" poster="assets/blobs/${a}.png" muted loop playsinline preload="metadata" aria-label="Blob ${l}"></video><div class="lab"><b class="${k}">${k === 'w' ? 'working' : 'resting'}</b><span>${l}</span></div></div>`).join('');
-  host.querySelectorAll('video').forEach(v => whenVisible(v, () => { if (!reduce) v.play().catch(() => {}); }, () => v.pause()));
-})();
-
-// The release box reads the same appcast the app checks: version, date, size and what's new.
+// The line under the button reads the same appcast the app checks.
 (async function release() {
   try {
     const xml = new DOMParser().parseFromString(await (await fetch('appcast.xml', { cache: 'no-cache' })).text(), 'application/xml');
     const item = xml.querySelector('item');
     if (!item) return;
-    const S = 'http://www.andymatuschak.org/xml-namespaces/sparkle';
-    const version = item.getElementsByTagNameNS(S, 'shortVersionString')[0]?.textContent;
-    const date = new Date(item.querySelector('pubDate')?.textContent);
+    const version = item.getElementsByTagNameNS('http://www.andymatuschak.org/xml-namespaces/sparkle', 'shortVersionString')[0]?.textContent;
     const bytes = +item.querySelector('enclosure')?.getAttribute('length');
-    const notes = [...item.querySelectorAll('description')].find(d => !d.getAttribute('xml:lang'));
-    if (version) {
-      $('rel-ver').textContent = `Slowburn ${version}`;
-      $('rel-link').href = `https://github.com/kdanet/slowburn/releases/tag/v${version}`;
-    }
     const bits = [];
-    if (!isNaN(date)) bits.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+    if (version) { bits.push(`Version ${version}`); $('rel-link').href = `https://github.com/kdanet/slowburn/releases/tag/v${version}`; }
     if (bytes) bits.push(`${(bytes / 1e6).toFixed(1)} MB`);
-    bits.push('signed and notarized');
-    $('rel-date').textContent = bits.join(' · ');
-    if (notes) {
-      const list = new DOMParser().parseFromString(notes.textContent, 'text/html').querySelectorAll('li');
-      $('rel-notes').replaceChildren(...[...list].map(li => Object.assign(document.createElement('li'), { textContent: li.textContent })));
-    }
+    bits.push('macOS 14+', 'signed and notarized by Apple');
+    $('rel-meta').textContent = bits.join(' · ');
   } catch {}
 })();
 
-$('copy').onclick = async () => {
-  try { await navigator.clipboard.writeText($('cmd').textContent); $('copy').textContent = 'Copied'; }
-  catch { const r = document.createRange(); r.selectNodeContents($('cmd')); getSelection().removeAllRanges(); getSelection().addRange(r); $('copy').textContent = 'Press ⌘C'; }
-  setTimeout(() => $('copy').textContent = 'Copy', 1800);
-};
 </script>
 </body>
 </html>
