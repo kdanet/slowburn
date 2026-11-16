@@ -29,8 +29,8 @@ public enum Brake {
             }
             if worst.level == .red, state.overrideUntil.map({ $0 > now }) != true,
                prompt?.trimmingCharacters(in: .whitespaces).hasPrefix(bypassPrefix) != true {
-                return .block(L("\(Phrases.reason(worst, now: now)) \(note) Чтобы продолжить за credits: начни сообщение с \(bypassPrefix) или выключи «Мягкий тормоз» в меню Slowburn на 30 мин.",
-                                 "\(Phrases.reason(worst, now: now)) \(note) To continue on credits: start your message with \(bypassPrefix) or switch off “Soft brake” in the Slowburn menu for 30 min."))
+                return .block(L("\(Phrases.reason(worst, now: now)) \(note) Чтобы продолжить за credits: начни сообщение с \(bypassPrefix) или приостанови ограничения в Slowburn на 30 мин.",
+                                 "\(Phrases.reason(worst, now: now)) \(note) To continue on credits: start your message with \(bypassPrefix) or pause the limits in Slowburn for 30 min."))
             }
             return .warn(note)
         }
@@ -44,8 +44,8 @@ public enum Brake {
                 return .warn(L("Обход тормоза (\(bypassPrefix)). \(Phrases.reason(worst, now: now))",
                                 "Brake bypassed (\(bypassPrefix)). \(Phrases.reason(worst, now: now))"))
             }
-            return .block(L("\(Phrases.reason(worst, now: now)) Чтобы всё равно отправить: начни сообщение с \(bypassPrefix) или выключи «Мягкий тормоз» в меню Slowburn на 30 мин.",
-                             "\(Phrases.reason(worst, now: now)) To send anyway: start your message with \(bypassPrefix) or switch off “Soft brake” in the Slowburn menu for 30 min."))
+            return .block(L("\(Phrases.reason(worst, now: now)) Чтобы всё равно отправить: начни сообщение с \(bypassPrefix) или приостанови ограничения в Slowburn на 30 мин.",
+                             "\(Phrases.reason(worst, now: now)) To send anyway: start your message with \(bypassPrefix) or pause the limits in Slowburn for 30 min."))
         }
         return .warn(Phrases.reason(worst, now: now))
     }

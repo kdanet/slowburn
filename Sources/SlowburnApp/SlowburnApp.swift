@@ -88,15 +88,17 @@ final class Model: ObservableObject {
         refreshing = false
     }
 
-    var brakeOn: Bool {
-        guard let until = presentation?.overrideUntil else { return true }
-        return until <= Date()
+    /// Limits paused for a while: no holds, warnings still on. nil when not paused.
+    var pausedUntil: Date? {
+        presentation?.overrideUntil.flatMap { $0 > Date() ? $0 : nil }
     }
 
-    func setBrake(_ on: Bool) {
-        if on { monitor.clearOverride() } else { try? monitor.allow(minutes: 30) }
+    func setPaused(_ paused: Bool) {
+        if paused { try? monitor.allow(minutes: Self.pauseMinutes) } else { monitor.clearOverride() }
         Task { await refresh() }
     }
+
+    static let pauseMinutes: Double = 30
 
     /// "+" adds one norm (or the last of the savings) to the current 5-hour slot; "−" takes the last one back.
     func boost(_ provider: Provider, _ step: Int) {
@@ -172,7 +174,8 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-            MasterSwitchCard(on: model.limitsOn) { model.setLimits($0) }
+            MasterSwitchCard(on: model.limitsOn, pausedUntil: model.pausedUntil,
+                             set: { model.setLimits($0) }, pause: { model.setPaused($0) })
             // Switching off releases every hold, so the queue empties by itself.
             if !holds.pending.isEmpty { HoldQueueCard(holds: holds, model: model, snapshot: !anchored) }
             if let p = model.presentation {
@@ -182,11 +185,6 @@ struct PopoverView: View {
                     // Off: the numbers stay for reference, but they no longer steer anything.
                     .opacity(model.limitsOn ? 1 : 0.5)
                 callouts(p)
-                // Kept in place when off (dimmed and inert): hiding it would change the panel's height,
-                // and a MenuBarExtra panel that changes height drifts away from the menu bar.
-                brake(p)
-                    .opacity(model.limitsOn ? 1 : 0.4)
-                    .allowsHitTesting(model.limitsOn)
             } else {
                 HStack(spacing: 12) {
                     BlobView(provider: .claude, mood: .unknown, level: 1, size: 40)
@@ -281,39 +279,6 @@ struct PopoverView: View {
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(color.opacity(0.14)))
-    }
-
-    private func brake(_ p: Presentation) -> some View {
-        let off = p.overrideUntil.map { $0 > Date() } ?? false
-        return InsetGroup {
-            HStack(spacing: 10) {
-                Image(systemName: off ? "hand.raised.slash" : "hand.raised")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(off ? Color.orange : Color.secondary)
-                    .frame(width: 30)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(L("Мягкий тормоз", "Soft brake")).font(.system(size: 12))
-                    Text(off ? L("Выключен до \(Phrases.time(p.overrideUntil!)) — только предупреждаю",
-                               "Off until \(Phrases.time(p.overrideUntil!)) — warnings only")
-                             : L("Поставит агентов на паузу, если за 5 часов съешь больше нормы, уйдёшь сверх плана недели или Codex начнёт тратить credits",
-                                 "Pauses agents if you burn more than the norm in 5 hours, go over the week's plan, or Codex starts spending credits"))
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer()
-                if anchored {
-                    Toggle(L("Мягкий тормоз", "Soft brake"), isOn: Binding(get: { model.brakeOn }, set: { model.setBrake($0) }))
-                        .toggleStyle(.switch)
-                        .controlSize(.mini)
-                        .labelsHidden()
-                } else {
-                    // Snapshots can't draw AppKit controls: a drawn switch stands in.
-                    BigSwitch(on: model.brakeOn).scaleEffect(0.6).frame(width: 32, height: 18)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
-        }
     }
 }
 
@@ -546,7 +511,12 @@ struct RoundedWindow: NSViewRepresentable {
                 round(sub)
             }
             // Opening the panel would otherwise put keyboard focus (and its ring) on the first control, the gear.
+            // With keyboard navigation on, AppKit and SwiftUI pick that control after the window becomes key,
+            // so the focus is dropped again once they are done; Tab still reaches every control.
             window.makeFirstResponder(nil)
+            for delay in [0.0, 0.05, 0.2] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak window] in window?.makeFirstResponder(nil) }
+            }
             if RoundedWindow.systemShadowIgnoresShape {
                 // The window server draws this panel's shadow, with its light rim, along the window's own nearly
                 // square corners whatever the content's shape: they stick out past ours as pale wedges.
@@ -572,34 +542,67 @@ struct RoundedWindow: NSViewRepresentable {
 /// The big switch at the top: limits and hooks on, or everything let through.
 struct MasterSwitchCard: View {
     var on: Bool
+    /// Paused for a while: agents are not held, warnings stay. Only while `on`.
+    var pausedUntil: Date?
     var set: (Bool) -> Void
+    var pause: (Bool) -> Void
+
+    private var paused: Bool { on && pausedUntil != nil }
 
     var body: some View {
-        Button { set(!on) } label: {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(on ? L("Ограничения включены", "Limits on") : L("Ограничения выключены", "Limits off"))
-                        .font(.system(size: 15, weight: .semibold))
-                    Text(on ? L("Хуки следят за лимитами и ставят агентов на паузу", "Hooks watch the limits and pause agents")
-                            : L("Агенты работают без пауз и предупреждений", "Agents run with no pauses or warnings"))
-                        .font(.system(size: 12)).foregroundStyle(.secondary)
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let tint: Color? = !on ? .orange : paused ? .yellow : nil
+        return VStack(alignment: .leading, spacing: 8) {
+            Button { set(!on) } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title).font(.system(size: 15, weight: .semibold))
+                        // Two lines in every state, so the card keeps its height.
+                        Text(subtitle)
+                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .lineLimit(2, reservesSpace: true)
+                    }
+                    Spacer(minLength: 8)
+                    BigSwitch(on: on)
                 }
-                Spacer(minLength: 8)
-                BigSwitch(on: on)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(on ? Color.primary.opacity(0.05) : Color.orange.opacity(0.14)))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(on ? Color.primary.opacity(0.06) : Color.orange.opacity(0.35), lineWidth: 0.5))
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(L("Ограничения", "Limits"))
+            .accessibilityValue(!on ? L("выключены", "off") : paused ? L("приостановлены", "paused") : L("включены", "on"))
+            .accessibilityAddTraits(.isButton)
+
+            // Pausing is for "let me finish this": half an hour, then the limits are back by themselves.
+            Button { pause(!paused) } label: {
+                Label(paused ? L("Вернуть сейчас", "Resume now")
+                             : L("Приостановить на \(Int(Model.pauseMinutes)) мин", "Pause for \(Int(Model.pauseMinutes)) min"),
+                      systemImage: paused ? "play.circle" : "pause.circle")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            // Off has nothing to pause; the row keeps its place so the panel does not change height.
+            .opacity(on ? 1 : 0)
+            .disabled(!on)
         }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(L("Ограничения и хуки", "Limits and hooks"))
-        .accessibilityValue(on ? L("включены", "on") : L("выключены", "off"))
-        .accessibilityAddTraits(.isButton)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(shape.fill(tint.map { $0.opacity(0.14) } ?? Color.primary.opacity(0.05)))
+        .overlay(shape.strokeBorder(tint.map { $0.opacity(0.35) } ?? Color.primary.opacity(0.06), lineWidth: 0.5))
+    }
+
+    private var title: String {
+        if !on { return L("Ограничения выключены", "Limits off") }
+        if let until = pausedUntil { return L("Приостановлены до \(Phrases.time(until))", "Paused until \(Phrases.time(until))") }
+        return L("Ограничения включены", "Limits on")
+    }
+
+    private var subtitle: String {
+        if !on { return L("Slowburn только считает: агенты работают без пауз и предупреждений", "Slowburn only counts: agents run with no pauses or warnings") }
+        if paused { return L("Агенты работают без пауз, предупреждения остаются", "Agents run with no pauses; warnings stay on") }
+        return L("Ставят агентов на паузу, когда тратишь больше нормы", "Pause agents when you spend more than the norm")
     }
 }
 

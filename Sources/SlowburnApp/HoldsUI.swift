@@ -73,7 +73,7 @@ final class HoldsModel: ObservableObject {
 
     /// Release, and keep the brake off for half an hour so the same agents do not queue again right away.
     func releaseAndPause(model: Model) {
-        model.setBrake(false)
+        model.setPaused(true)
         releaseAll()
     }
 

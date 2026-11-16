@@ -177,7 +177,7 @@ enum IconExport {
             write(mini(HoldQueueCard(holds: HoldsModel.shared, model: model, snapshot: true)), scale: 2,
                   to: base.appendingPathComponent("hold.png"))
         }
-        write(mini(MasterSwitchCard(on: true) { _ in }), scale: 2, to: base.appendingPathComponent("switch.png"))
+        write(mini(MasterSwitchCard(on: true, set: { _ in }, pause: { _ in })), scale: 2, to: base.appendingPathComponent("switch.png"))
         exit(0)
     }
 
