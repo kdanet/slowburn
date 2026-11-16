@@ -7,6 +7,15 @@
     <language>en</language>
     <!-- releases -->
     <item>
+      <title>Slowburn 0.2.0</title>
+      <pubDate>Mon, 16 Nov 2026 10:41:06 GMT</pubDate>
+      <sparkle:version>21</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://github.com/kdanet/slowburn/releases/tag/v0.2.0</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/kdanet/slowburn/releases/download/v0.2.0/Slowburn-0.2.0.zip" type="application/octet-stream" sparkle:edSignature="JQ9lekGp6UAVxa9afdCof+iJG2I8v19EcVQgiegXEGuMuoVaT5B2BHQWvgVb0nE3XxcnWrBH2KpaFNm+KLCVDQ==" length="3895913"/>
+    </item>
+    <item>
       <title>Slowburn 0.1.0</title>
       <pubDate>Mon, 16 Nov 2026 10:11:23 GMT</pubDate>
       <sparkle:version>18</sparkle:version>
