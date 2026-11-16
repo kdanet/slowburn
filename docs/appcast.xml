@@ -7,6 +7,16 @@
     <language>en</language>
     <!-- releases -->
     <item>
+      <title>Slowburn 0.2.1</title>
+      <pubDate>Mon, 16 Nov 2026 11:31:49 GMT</pubDate>
+      <sparkle:version>24</sparkle:version>
+      <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[<ul><li>“Limits” and “Soft brake” are now one card: switch the limits off entirely, or pause them for 30 minutes — agents run without pauses, warnings stay on.</li><li>The gear no longer lights up when the panel opens.</li></ul>]]></description>
+      <description xml:lang="ru"><![CDATA[<ul><li>«Ограничения» и «Мягкий тормоз» объединены в одну карточку: ограничения можно выключить совсем или приостановить на 30 минут — тогда агенты работают без пауз, а предупреждения остаются.</li><li>Шестерёнка больше не подсвечивается при открытии панели.</li></ul>]]></description>
+      <enclosure url="https://github.com/kdanet/slowburn/releases/download/v0.2.1/Slowburn-0.2.1.zip" type="application/octet-stream" sparkle:edSignature="n03bkwoCYQegfx1xSq2pEbWEWTeB3T1oQoSpG0T0Rb+x3GiH1qbGiMFo/NypJD0aG4oer8lNFXntLE8HU009Aw==" length="3884944"/>
+    </item>
+    <item>
       <title>Slowburn 0.2.0</title>
       <pubDate>Mon, 16 Nov 2026 10:41:06 GMT</pubDate>
       <sparkle:version>21</sparkle:version>
