@@ -246,14 +246,29 @@ struct SmartLayout: View {
 
     /// Name, the traffic-light phrase as the card's title, when the week resets — and the blob, big.
     private func header(blob: BlobModel, status: Status, main: LimitRow, window: LimitRow?) -> some View {
-        // Both resets on one line: the rolling 5 hours (when they empty out if nothing more is spent), then the week.
-        var sub = L("Сброс недели \(Phrases.time(main.resetsAt))", "Week resets \(Phrases.time(main.resetsAt))")
-        if let clears = main.fiveHourClearsAt {
-            sub = L("Сброс 5 ч в \(Phrases.time(clears)) · недели \(Phrases.time(main.resetsAt))",
-                    "5 h reset \(Phrases.time(clears)) · week \(Phrases.time(main.resetsAt))")
+        // Both resets as icon + time: the clock for the rolling 5 hours (when they empty out if nothing more is
+        // spent), the calendar for the week. Then the provider's own window while it is low.
+        func item(_ icon: String, _ text: String, help: String) -> some View {
+            HStack(spacing: 4) {
+                Image(systemName: icon).font(.system(size: 11, weight: .medium))
+                Text(text)
+            }
+            .help(help)
         }
-        // The provider's own window while it is low; a busy 5-hour reset takes its place (one line only).
-        if let w = window, w.used < 50, main.fiveHourClearsAt == nil { sub += L(" · окно \(main.provider.company) \(Int(w.used.rounded()))%", " · \(main.provider.company) window \(Int(w.used.rounded()))%") }
+        let caption = HStack(spacing: 12) {
+            if let clears = main.fiveHourClearsAt {
+                item("clock", Phrases.time(clears),
+                     help: L("5 часов обнулятся к \(Phrases.time(clears)), если больше не тратить",
+                             "The 5 hours clear by \(Phrases.time(clears)) if you stop spending"))
+            }
+            item("calendar", Phrases.time(main.resetsAt),
+                 help: L("Сброс недели \(Phrases.time(main.resetsAt))", "The week resets \(Phrases.time(main.resetsAt))"))
+            if let w = window, w.used < 50 {
+                Text(L("окно \(main.provider.company) \(Int(w.used.rounded()))%", "\(main.provider.company) window \(Int(w.used.rounded()))%"))
+            }
+        }
+        .font(.system(size: 12.5)).foregroundStyle(.secondary)
+        .lineLimit(1).minimumScaleFactor(0.8)
         return HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
@@ -272,8 +287,7 @@ struct SmartLayout: View {
                     .font(.system(size: 24, weight: .bold)).tracking(-0.4)
                     .foregroundStyle(status.color == .green ? Color.primary : status.color)
                     .lineLimit(1).minimumScaleFactor(0.7)
-                Text(sub).font(.system(size: 12.5)).foregroundStyle(.secondary)
-                    .lineLimit(1).minimumScaleFactor(0.8)
+                caption
             }
             Spacer(minLength: 0)
             BlobView(provider: blob.provider, mood: blob.mood, level: 1, size: 60, activity: activities[blob.provider])
